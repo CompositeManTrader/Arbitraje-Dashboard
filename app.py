@@ -15,7 +15,7 @@ import streamlit as st
 # ─────────────────────────────────────────────────────────────────────────────
 # ★ EDITA ESTE VALOR ★
 # ─────────────────────────────────────────────────────────────────────────────
-GITHUB_REPO = "tu_usuario/arbitrage-monitor"   # igual que en uploader.py
+GITHUB_REPO = "CompositeManTrader/Arbitraje-Dashboard"  # igual que en uploader.py
 BRANCH      = "main"
 # ─────────────────────────────────────────────────────────────────────────────
 
