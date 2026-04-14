@@ -17,7 +17,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ── EDITA ESTE VALOR con la URL que te da ngrok ───────────────────────────────
-SERVER_URL = "https://discount-angling-finale.ngrok-free.dev -> http://localhost:8000"   # <-- cambia esto
+SERVER_URL = "https://abc123.ngrok-free.app"   # <-- cambia esto
 # ─────────────────────────────────────────────────────────────────────────────
 
 CDMX       = ZoneInfo("America/Mexico_City")
@@ -335,14 +335,22 @@ alert_ph = st.empty()
 tabs_ph  = st.empty()
 foot_ph  = st.empty()
 
-iteration = 0
-prev_uc = prev_uv = None
+if "iteration" not in st.session_state:
+    st.session_state.iteration = 0
+if "prev_uc" not in st.session_state:
+    st.session_state.prev_uc = None
+if "prev_uv" not in st.session_state:
+    st.session_state.prev_uv = None
 
-# ─────────────────────────────────────────────────────────────────────────────
-# LOOP PRINCIPAL
-# ─────────────────────────────────────────────────────────────────────────────
-while True:
-    iteration += 1
+st.session_state.iteration += 1
+iteration = st.session_state.iteration
+prev_uc   = st.session_state.prev_uc
+prev_uv   = st.session_state.prev_uv
+
+if True:
+    pass
+
+if True:
     now      = cdmx_now()
     now_time = now.strftime("%H:%M:%S")
     now_full = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -432,6 +440,8 @@ while True:
                 d_c = f"{'▲' if prev_uc is None or uc>=prev_uc else '▼'} ${abs(uc-(prev_uc or uc)):,.2f}" if prev_uc is not None else "sesión actual"
                 d_v = f"{'▲' if prev_uv is None or uv>=prev_uv else '▼'} ${abs(uv-(prev_uv or uv)):,.2f}" if prev_uv is not None else "sesión actual"
                 prev_uc, prev_uv = uc, uv
+                st.session_state.prev_uc = uc
+                st.session_state.prev_uv = uv
 
                 st.markdown(f"""<div class="content">
                 <div class="metric-strip">
@@ -504,3 +514,4 @@ while True:
         </div>""", unsafe_allow_html=True)
 
     time.sleep(refresh_sec)
+    st.rerun()
