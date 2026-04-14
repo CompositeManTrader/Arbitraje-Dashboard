@@ -184,7 +184,10 @@ def fu(v):
 # HTML TABLE BUILDER
 # ─────────────────────────────────────────────────────────────────────────────
 def build_table_html(df: pd.DataFrame, tipo: str) -> str:
+    """Builds a full standalone HTML document for rendering via components.html()"""
     accent = "#3d9aff" if tipo == "compra" else "#b060ff"
+    nrows  = len(df)
+    height = nrows * 44 + 52   # row height + header
 
     rows_html = ""
     for _, row in df.iterrows():
@@ -211,148 +214,134 @@ def build_table_html(df: pd.DataFrame, tipo: str) -> str:
             <td class="td-pais">{str(row.get('País','')).strip()}</td>
         </tr>"""
 
-    return f"""
-    <style>
-    .arb-table-wrap {{
-        width: 100%;
-        overflow-x: auto;
-        border-radius: 8px;
-        border: 1px solid #162035;
-        background: #080e1c;
-        margin-bottom: 4px;
-    }}
-    .arb-table {{
-        width: 100%;
-        border-collapse: collapse;
-        font-family: 'Barlow', sans-serif;
-        font-size: 13px;
-        table-layout: fixed;
-    }}
-    .arb-table thead tr {{
-        background: #0c1528;
-        border-bottom: 2px solid {accent}22;
-    }}
-    .arb-table thead th {{
-        padding: 10px 12px;
-        font-family: 'Fira Code', monospace;
-        font-size: 9px;
-        font-weight: 600;
-        color: #4a6280;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        white-space: nowrap;
-        border-bottom: 1px solid #162035;
-    }}
-    .arb-table thead th.th-accent {{
-        color: {accent};
-        border-bottom: 2px solid {accent};
-    }}
-    .arb-table thead th.r {{ text-align: right; }}
-    .arb-table tbody tr {{
-        border-bottom: 1px solid #0f1828;
-        transition: background .15s;
-    }}
-    .arb-table tbody tr:hover {{ background: #0e1930; }}
-    .arb-table tbody tr:last-child {{ border-bottom: none; }}
-    .arb-table td {{
-        padding: 9px 12px;
-        color: #c8d8e8;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        vertical-align: middle;
-    }}
-    .td-num {{
-        width: 42px;
-        font-family: 'Fira Code', monospace;
-        font-size: 11px;
-        color: #283850;
-        text-align: center;
-    }}
-    .td-ticker {{
-        width: 90px;
-        font-family: 'Fira Code', monospace;
-        font-size: 13px;
-        font-weight: 600;
-        color: {accent};
-        letter-spacing: .5px;
-    }}
-    .td-empresa {{
-        width: auto;
-        font-size: 12px;
-        font-weight: 500;
-        color: #99adc4;
-    }}
-    .td-op {{ width: 110px; }}
-    .td-r {{ text-align: right; width: 110px; }}
-    .td-pais {{
-        width: 130px;
-        font-size: 11px;
-        color: #4a6280;
-        font-weight: 500;
-    }}
-    .mono {{ font-family: 'Fira Code', monospace; font-size: 12px; }}
-    .dim  {{ color: #3a5272 !important; }}
+    return height, f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+html, body {{
+    background: #04080f;
+    color: #c8d8e8;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    overflow-x: hidden;
+}}
+.wrap {{
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #162035;
+    background: #080e1c;
+    overflow: hidden;
+}}
+table {{
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}}
+thead tr {{
+    background: #0b1422;
+    border-bottom: 2px solid {accent}33;
+}}
+thead th {{
+    padding: 10px 12px;
+    font-family: 'Fira Code', monospace;
+    font-size: 9px; font-weight: 600;
+    color: #3a5272; letter-spacing: 1.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border-bottom: 1px solid #162035;
+    user-select: none;
+}}
+thead th.r  {{ text-align: right; }}
+thead th.hi {{ color: {accent}; border-bottom: 2px solid {accent}; }}
+tbody tr {{
+    border-bottom: 1px solid #0d1624;
+    transition: background .12s;
+    cursor: default;
+}}
+tbody tr:hover {{ background: #0e1a2e; }}
+tbody tr:last-child {{ border-bottom: none; }}
+td {{
+    padding: 9px 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    color: #aabdd0;
+}}
+/* Column widths */
+col.c-num    {{ width: 42px; }}
+col.c-ticker {{ width: 88px; }}
+col.c-emp    {{ width: auto; }}
+col.c-op     {{ width: 108px; }}
+col.c-num2   {{ width: 72px; }}
+col.c-money  {{ width: 108px; }}
+col.c-justo  {{ width: 118px; }}
+col.c-rdto   {{ width: 108px; }}
+col.c-util   {{ width: 114px; }}
+col.c-inv    {{ width: 118px; }}
+col.c-pais   {{ width: 126px; }}
 
-    /* Badges */
-    .badge {{
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 3px;
-        font-family: 'Fira Code', monospace;
-        font-size: 9px; font-weight: 600;
-        letter-spacing: 1px;
-    }}
-    .badge-bmv  {{ background: rgba(61,154,255,.12); color: #3d9aff; border: 1px solid rgba(61,154,255,.2); }}
-    .badge-biva {{ background: rgba(0,200,212,.12);  color: #00c8d4; border: 1px solid rgba(0,200,212,.2); }}
-    .badge-both {{ background: rgba(232,184,75,.12); color: #e8b84b; border: 1px solid rgba(232,184,75,.2); }}
+.td-num  {{ text-align:center; font-family:'Fira Code',monospace; font-size:11px; color:#1e3050; }}
+.td-ticker {{ font-family:'Fira Code',monospace; font-size:13px; font-weight:600; color:{accent}; letter-spacing:.5px; }}
+.td-empresa {{ font-size:12px; font-weight:500; color:#8aadcc; }}
+.td-op {{ }}
+.td-r  {{ text-align:right; }}
+.td-pais {{ font-size:11px; color:#3a5272; font-weight:500; }}
+.mono {{ font-family:'Fira Code',monospace; font-size:12px; }}
+.dim  {{ color:#243548 !important; }}
 
-    /* Pct colors */
-    .pct-up {{ color: #00d68f; font-family:'Fira Code',monospace; font-size:12px; font-weight:600; }}
-    .pct-dn {{ color: #ff4d6a; font-family:'Fira Code',monospace; font-size:12px; font-weight:600; }}
-    .util-pos {{ color: #00d68f; font-family:'Fira Code',monospace; font-size:12px; font-weight:600; }}
-    .util-neg {{ color: #ff4d6a; font-family:'Fira Code',monospace; font-size:12px; }}
+.badge {{
+    display:inline-block; padding:2px 8px; border-radius:3px;
+    font-family:'Fira Code',monospace; font-size:9px; font-weight:600; letter-spacing:1px;
+}}
+.badge-bmv  {{ background:rgba(61,154,255,.12); color:#3d9aff; border:1px solid rgba(61,154,255,.25); }}
+.badge-biva {{ background:rgba(0,200,212,.12);  color:#00c8d4; border:1px solid rgba(0,200,212,.25); }}
+.badge-both {{ background:rgba(232,184,75,.12); color:#e8b84b; border:1px solid rgba(232,184,75,.25); }}
 
-    /* Column widths */
-    .arb-table colgroup col:nth-child(1)  {{ width: 42px; }}
-    .arb-table colgroup col:nth-child(2)  {{ width: 88px; }}
-    .arb-table colgroup col:nth-child(3)  {{ width: auto; min-width:180px; }}
-    .arb-table colgroup col:nth-child(4)  {{ width: 110px; }}
-    .arb-table colgroup col:nth-child(5)  {{ width: 75px; }}
-    .arb-table colgroup col:nth-child(6)  {{ width: 110px; }}
-    .arb-table colgroup col:nth-child(7)  {{ width: 120px; }}
-    .arb-table colgroup col:nth-child(8)  {{ width: 110px; }}
-    .arb-table colgroup col:nth-child(9)  {{ width: 115px; }}
-    .arb-table colgroup col:nth-child(10) {{ width: 120px; }}
-    .arb-table colgroup col:nth-child(11) {{ width: 130px; }}
-    </style>
+.pct-up  {{ color:#00d68f; font-family:'Fira Code',monospace; font-size:12px; font-weight:600; }}
+.pct-dn  {{ color:#ff4d6a; font-family:'Fira Code',monospace; font-size:12px; font-weight:600; }}
+.util-pos{{ color:#00d68f; font-family:'Fira Code',monospace; font-size:12px; font-weight:700; }}
+.util-neg{{ color:#ff4d6a; font-family:'Fira Code',monospace; font-size:12px; }}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <table>
+    <colgroup>
+      <col class="c-num"><col class="c-ticker"><col class="c-emp">
+      <col class="c-op"><col class="c-num2"><col class="c-money">
+      <col class="c-justo"><col class="c-rdto"><col class="c-util">
+      <col class="c-inv"><col class="c-pais">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Ticker</th>
+        <th>Empresa</th>
+        <th>Bolsa</th>
+        <th class="r">Títulos</th>
+        <th class="r">Diferencia</th>
+        <th class="r">Precio Justo</th>
+        <th class="r hi">Rdto %</th>
+        <th class="r hi">Utilidad $</th>
+        <th class="r">Inversión</th>
+        <th>País</th>
+      </tr>
+    </thead>
+    <tbody>
+      {rows_html}
+    </tbody>
+  </table>
+</div>
+</body></html>
+"""
 
-    <div class="arb-table-wrap">
-      <table class="arb-table">
-        <colgroup>
-          <col><col><col><col><col><col><col><col><col><col><col>
-        </colgroup>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Ticker</th>
-            <th>Empresa</th>
-            <th>Bolsa</th>
-            <th class="r">Títulos</th>
-            <th class="r">Diferencia</th>
-            <th class="r">Precio Justo</th>
-            <th class="r th-accent">Rdto %</th>
-            <th class="r th-accent">Utilidad $</th>
-            <th class="r">Inversión</th>
-            <th>País</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows_html}
-        </tbody>
-      </table>
-    </div>
-    """
+
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -523,9 +512,10 @@ while True:
           <span class="tbl-total tt-green">${uc:,.2f} utilidad total</span>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown(build_table_html(df_c, "compra"), unsafe_allow_html=True)
+        h_c, html_c = build_table_html(df_c, "compra")
+        components.html(html_c, height=h_c, scrolling=False)
 
-        st.markdown("<div style='height:22px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
 
         # Tabla Venta
         st.markdown(f"""
@@ -535,7 +525,8 @@ while True:
           <span class="tbl-total tt-purple">${uv:,.2f} utilidad total</span>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown(build_table_html(df_v, "venta"), unsafe_allow_html=True)
+        h_v, html_v = build_table_html(df_v, "venta")
+        components.html(html_v, height=h_v, scrolling=False)
 
         st.markdown('</div>', unsafe_allow_html=True)
 
