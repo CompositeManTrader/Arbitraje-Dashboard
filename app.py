@@ -1,13 +1,11 @@
 """
-app.py v7 — Monitor Arbitraje + Cotizador
-==========================================
-Lee datos DIRECTO desde el servidor local via ngrok.
-Sin GitHub. Latencia ~500ms.
-
-EDITA SERVER_URL con la URL que te da ngrok.
+app.py v8 — Sin parpadeo
+=========================
+Usa fragmentos de Streamlit para actualizar solo los datos
+sin recargar toda la página.
 """
 
-import time, json
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -16,8 +14,8 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ── EDITA ESTE VALOR con la URL que te da ngrok ───────────────────────────────
-SERVER_URL = "https://discount-angling-finale.ngrok-free.dev"  # <-- cambia esto
+# ── EDITA ESTE VALOR ─────────────────────────────────────────────────────────
+SERVER_URL = "https://discount-angling-finale.ngrok-free.dev"
 # ─────────────────────────────────────────────────────────────────────────────
 
 CDMX       = ZoneInfo("America/Mexico_City")
@@ -125,18 +123,14 @@ section[data-testid="stSidebar"]{ background:var(--bg1) !important; border-right
 .fx-bid{color:var(--blue)} .fx-ask{color:var(--yellow)}
 .fx-sep{ width:1px; height:40px; background:var(--border); }
 .fx-title{ font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; color:var(--text2); letter-spacing:2px; text-transform:uppercase; margin-right:8px; }
-
-/* LATENCY BADGE */
-.lat-badge{ font-family:'Fira Code',monospace; font-size:10px; color:var(--green); background:rgba(0,214,143,.08); border:1px solid rgba(0,214,143,.2); padding:3px 10px; border-radius:4px; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FETCH DIRECTO DESDE SERVIDOR — sin cache, siempre fresco
+# DATA FETCH
 # ─────────────────────────────────────────────────────────────────────────────
 def fetch_all():
-    """Llama al servidor local via ngrok y trae todos los datos."""
     t0 = time.time()
     try:
         r = requests.get(
@@ -145,14 +139,12 @@ def fetch_all():
             headers={"ngrok-skip-browser-warning": "true"}
         )
         if r.status_code == 200:
-            latency_ms = int((time.time() - t0) * 1000)
             data = r.json()
-            data["latency_ms"] = latency_ms
+            data["latency_ms"] = int((time.time() - t0) * 1000)
             return data
-    except Exception as e:
+    except Exception:
         pass
     return None
-
 
 def cdmx_now():
     return datetime.now(CDMX)
@@ -190,7 +182,7 @@ def fi(v):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BUILD MONITOR TABLE
+# BUILD MONITOR TABLE (iframe completo — sin parpadeo)
 # ─────────────────────────────────────────────────────────────────────────────
 def build_monitor_table(records, tipo):
     accent = "#3d9aff" if tipo == "compra" else "#b060ff"
@@ -229,19 +221,19 @@ html,body{{background:#04080f;color:#c8d8e8;font-family:'Barlow',sans-serif;font
 .wrap{{width:100%;border-radius:8px;border:1px solid #162035;background:#080e1c;overflow:hidden}}
 table{{width:100%;border-collapse:collapse;table-layout:fixed}}
 thead tr{{background:#0b1422;border-bottom:2px solid {accent}33}}
-thead th{{padding:10px 12px;font-family:'Fira Code',monospace;font-size:9px;font-weight:600;color:#3a5272;letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid #162035}}
+thead th{{padding:10px 12px;font-family:'Fira Code',monospace;font-size:9px;font-weight:600;color:#3a5272;letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid #162035;white-space:nowrap}}
 thead th.r{{text-align:right}} thead th.hi{{color:{accent};border-bottom:2px solid {accent}}}
 tbody tr{{border-bottom:1px solid #0d1624;transition:background .12s}}
 tbody tr:hover{{background:#0e1a2e}} tbody tr:last-child{{border-bottom:none}}
 td{{padding:9px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;color:#aabdd0}}
 col.c-num{{width:42px}} col.c-tick{{width:88px}} col.c-emp{{width:auto}}
-col.c-op{{width:108px}} col.c-tit{{width:72px}} col.c-dif{{width:108px}}
-col.c-just{{width:118px}} col.c-rdto{{width:108px}} col.c-util{{width:114px}}
-col.c-inv{{width:118px}} col.c-pais{{width:126px}}
+col.c-op{{width:115px}} col.c-tit{{width:72px}} col.c-dif{{width:105px}}
+col.c-just{{width:115px}} col.c-rdto{{width:105px}} col.c-util{{width:112px}}
+col.c-inv{{width:115px}} col.c-pais{{width:122px}}
 .td-num{{text-align:center;font-family:'Fira Code',monospace;font-size:11px;color:#1e3050}}
 .td-ticker{{font-family:'Fira Code',monospace;font-size:13px;font-weight:600;color:{accent}}}
 .td-empresa{{font-size:12px;font-weight:500;color:#8aadcc}}
-.td-r{{text-align:right}} .td-pais{{font-size:11px;color:#3a5272}}
+.td-r{{text-align:right}} .td-pais{{font-size:11px;color:#3a5272;font-weight:500}}
 .mono{{font-family:'Fira Code',monospace;font-size:12px}} .dim{{color:#243548!important}}
 .badge{{display:inline-block;padding:2px 8px;border-radius:3px;font-family:'Fira Code',monospace;font-size:9px;font-weight:600;letter-spacing:1px}}
 .badge-bmv{{background:rgba(61,154,255,.12);color:#3d9aff;border:1px solid rgba(61,154,255,.25)}}
@@ -283,12 +275,7 @@ def build_cotizador_table(rows_data):
                 s = float(ask) - float(bid)
                 spread = f'<span style="color:#4a6280;font-family:Fira Code,monospace;font-size:11px">${s:.4f}</span>'
             except: pass
-        rows += f"""<tr>
-            <td class="td-em">{em}</td>
-            <td class="td-r">{ask_str}</td>
-            <td class="td-r">{bid_str}</td>
-            <td class="td-r">{spread}</td>
-        </tr>"""
+        rows += f"<tr><td class='td-em'>{em}</td><td class='td-r'>{ask_str}</td><td class='td-r'>{bid_str}</td><td class='td-r'>{spread}</td></tr>"
 
     return height, f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
@@ -320,37 +307,46 @@ col.c-em{{width:auto}} col.c-ask{{width:160px}} col.c-bid{{width:160px}} col.c-s
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚙️ Parámetros")
-    refresh_sec = st.slider("Refresco (seg)", 1, 30, 1, 1)
+    refresh_sec = st.slider("Refresco (seg)", 1, 30, 3, 1)
     st.markdown("---")
     st.caption(f"Servidor: `{SERVER_URL}`")
-    st.caption("Zona: **CDMX**")
-    st.caption("⚡ Latencia directa ~500ms")
+    st.caption("Zona: **CDMX**  ·  ⚡ Latencia directa")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LAYOUT ESTÁTICO — se renderiza UNA SOLA VEZ, no parpadea
+# ─────────────────────────────────────────────────────────────────────────────
+# Navbar estática (solo cambia el reloj y status — dentro del fragment)
+nav_ph    = st.empty()
+alert_ph  = st.empty()
+
+tab1, tab2 = st.tabs(["📊  MONITOR  $", "💱  COTIZADOR"])
+
+with tab1:
+    metrics_ph  = st.empty()
+    header_c_ph = st.empty()
+    table_c_ph  = st.empty()
+    spacer_ph   = st.empty()
+    header_v_ph = st.empty()
+    table_v_ph  = st.empty()
+
+with tab2:
+    fx_ph    = st.empty()
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown('<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:#4a6280;text-transform:uppercase;padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">Emisoras Fijas</div>', unsafe_allow_html=True)
+        fijo_ph = st.empty()
+    with col2:
+        st.markdown('<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:#4a6280;text-transform:uppercase;padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">Cotización Manual (A10:A20)</div>', unsafe_allow_html=True)
+        edit_ph = st.empty()
+
+foot_ph = st.empty()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PLACEHOLDERS
+# FUNCIÓN DE ACTUALIZACIÓN — solo actualiza los placeholders, sin recargar UI
 # ─────────────────────────────────────────────────────────────────────────────
-nav_ph   = st.empty()
-alert_ph = st.empty()
-tabs_ph  = st.empty()
-foot_ph  = st.empty()
-
-if "iteration" not in st.session_state:
-    st.session_state.iteration = 0
-if "prev_uc" not in st.session_state:
-    st.session_state.prev_uc = None
-if "prev_uv" not in st.session_state:
-    st.session_state.prev_uv = None
-
-st.session_state.iteration += 1
-iteration = st.session_state.iteration
-prev_uc   = st.session_state.prev_uc
-prev_uv   = st.session_state.prev_uv
-
-if True:
-    pass
-
-if True:
+@st.fragment(run_every=refresh_sec)
+def update_data():
     now      = cdmx_now()
     now_time = now.strftime("%H:%M:%S")
     now_full = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -362,24 +358,22 @@ if True:
     if data is None:
         status = "dead"; secs_str = "—"; last_update = "—"; latency_ms = 0
     else:
-        last_update = data.get("last_update","—")
+        last_update = data.get("last_update", "—")
         latency_ms  = data.get("latency_ms", 0)
         secs_ago    = 9999; secs_str = "—"
         if last_update and last_update != "—":
             try:
-                lu = datetime.strptime(last_update, "%Y-%m-%d %H:%M:%S").replace(tzinfo=CDMX)
+                lu       = datetime.strptime(last_update, "%Y-%m-%d %H:%M:%S").replace(tzinfo=CDMX)
                 secs_ago = (now - lu).total_seconds()
                 secs_str = f"{int(secs_ago)}s" if secs_ago < 60 else f"{int(secs_ago/60)}m {int(secs_ago%60)}s"
             except: pass
-        if secs_ago > DEAD_SECS:   status = "dead"
-        elif secs_ago > STALE_SECS: status = "warn"
-        else:                        status = "live"
+        status = "dead" if secs_ago > DEAD_SECS else "warn" if secs_ago > STALE_SECS else "live"
 
     compra_records = data.get("compra", []) if data else []
     venta_records  = data.get("venta",  []) if data else []
     calc           = data.get("calc",   {}) if data else {}
 
-    h = now.hour
+    h    = now.hour
     mkts = {"BMV":8<=h<15,"BIVA":8<=h<15,"NYSE":8<=h<15,"NASDAQ":8<=h<15}
     mkt_html = "".join([
         f'<div class="nav-market"><div class="nm-name">{k}</div>'
@@ -390,128 +384,112 @@ if True:
     lat_color = "#00d68f" if latency_ms < 800 else "#ffaa00" if latency_ms < 2000 else "#ff4d6a"
     lat_html  = f'<span style="font-family:Fira Code,monospace;font-size:10px;color:{lat_color};background:rgba(0,0,0,.3);border:1px solid {lat_color}33;padding:3px 10px;border-radius:4px">⚡ {latency_ms}ms</span>'
 
-    if status=="live":
-        badge='<span class="pill pill-live"><span class="pdot pdot-live"></span>EN VIVO</span>'
-    elif status=="warn":
-        badge=f'<span class="pill pill-warn"><span class="pdot pdot-warn"></span>SIN CAMBIOS · {secs_str}</span>'
+    if status == "live":
+        badge = '<span class="pill pill-live"><span class="pdot pdot-live"></span>EN VIVO</span>'
+    elif status == "warn":
+        badge = f'<span class="pill pill-warn"><span class="pdot pdot-warn"></span>SIN CAMBIOS · {secs_str}</span>'
     else:
-        badge=f'<span class="pill pill-dead"><span class="pdot pdot-dead"></span>DESCONECTADO</span>'
+        badge = f'<span class="pill pill-dead"><span class="pdot pdot-dead"></span>DESCONECTADO</span>'
 
     # ── NAVBAR ────────────────────────────────────────────────────────────────
-    with nav_ph.container():
-        st.markdown(f"""
-        <div class="navbar">
-          <div class="nav-brand">
-            <div class="nav-logo">ARB</div>
-            <div><div class="nav-name">Composite Man</div>
-            <div class="nav-tagline">Arbitrage Intelligence Platform</div></div>
-          </div>
-          <div class="nav-markets">{mkt_html}</div>
-          <div class="nav-right">
-            {lat_html}
-            <div><div class="nav-clock">{now_time}</div>
-            <div class="nav-tz">CDMX · {now_date}</div></div>
-            {badge}
-          </div>
-        </div>""", unsafe_allow_html=True)
+    nav_ph.markdown(f"""
+    <div class="navbar">
+      <div class="nav-brand">
+        <div class="nav-logo">ARB</div>
+        <div><div class="nav-name">Composite Man</div>
+        <div class="nav-tagline">Arbitrage Intelligence Platform</div></div>
+      </div>
+      <div class="nav-markets">{mkt_html}</div>
+      <div class="nav-right">
+        {lat_html}
+        <div><div class="nav-clock">{now_time}</div>
+        <div class="nav-tz">CDMX · {now_date}</div></div>
+        {badge}
+      </div>
+    </div>""", unsafe_allow_html=True)
 
     # ── ALERT ─────────────────────────────────────────────────────────────────
-    with alert_ph.container():
-        if status == "warn":
-            st.markdown(f'<div class="alert-strip alert-warn">⚠ &nbsp; Bloomberg sin cambios hace <strong>{secs_str}</strong> · Último dato: <strong>{last_update} CDMX</strong></div>', unsafe_allow_html=True)
-        elif status == "dead":
-            st.markdown(f'<div class="alert-strip alert-dead">✖ &nbsp; Sin conexión al servidor · Verifica que <strong>start.bat</strong> esté corriendo en la PC Bloomberg · URL: <strong>{SERVER_URL}</strong></div>', unsafe_allow_html=True)
+    if status == "warn":
+        alert_ph.markdown(f'<div class="alert-strip alert-warn">⚠ &nbsp; Bloomberg sin cambios hace <strong>{secs_str}</strong> · Último dato: <strong>{last_update} CDMX</strong></div>', unsafe_allow_html=True)
+    elif status == "dead":
+        alert_ph.markdown(f'<div class="alert-strip alert-dead">✖ &nbsp; Sin conexión al servidor · Verifica que <strong>start.bat</strong> esté corriendo · URL: <strong>{SERVER_URL}</strong></div>', unsafe_allow_html=True)
+    else:
+        alert_ph.empty()
 
-    # ── TABS ──────────────────────────────────────────────────────────────────
-    with tabs_ph.container():
-        tab1, tab2 = st.tabs(["📊  MONITOR  $", "💱  COTIZADOR"])
+    # ── MÉTRICAS ──────────────────────────────────────────────────────────────
+    if compra_records:
+        uc   = sum(float(r.get("Utilidad",0) or 0) for r in compra_records)
+        uv   = sum(float(r.get("Utilidad",0) or 0) for r in venta_records)
+        inv  = sum(float(r.get("Inversión", r.get("Inversion",0)) or 0) for r in compra_records)
+        rmax = max((float(r.get("Rendimiento",0) or 0) for r in compra_records), default=0)
+        nc, nv = len(compra_records), len(venta_records)
 
-        # ── TAB 1: MONITOR ────────────────────────────────────────────────────
-        with tab1:
-            if not compra_records:
-                st.markdown('<div class="content"><div style="padding:40px;text-align:center;color:#3a5272;font-family:Fira Code,monospace">Sin datos · Verifica que start.bat esté corriendo</div></div>', unsafe_allow_html=True)
-            else:
-                uc   = sum(float(r.get("Utilidad",0) or 0) for r in compra_records)
-                uv   = sum(float(r.get("Utilidad",0) or 0) for r in venta_records)
-                inv  = sum(float(r.get("Inversión", r.get("Inversion",0)) or 0) for r in compra_records)
-                rmax = max((float(r.get("Rendimiento",0) or 0) for r in compra_records), default=0)
-                nc, nv = len(compra_records), len(venta_records)
+        metrics_ph.markdown(f"""<div class="content">
+        <div class="metric-strip">
+          <div class="metric-cell mc-gold"><div class="metric-label">Utilidad Compra</div><div class="metric-value mv-gold">${uc:,.2f}</div><div class="metric-sub">{nc} oportunidades</div></div>
+          <div class="metric-cell mc-purple"><div class="metric-label">Utilidad Venta</div><div class="metric-value mv-purple">${uv:,.2f}</div><div class="metric-sub">{nv} oportunidades</div></div>
+          <div class="metric-cell mc-green"><div class="metric-label">Mejor Rendimiento</div><div class="metric-value mv-green">{rmax*100:.3f}%</div><div class="metric-sub">top oportunidad</div></div>
+          <div class="metric-cell mc-teal"><div class="metric-label">Capital Requerido</div><div class="metric-value mv-teal">${inv:,.0f}</div><div class="metric-sub">inversión compras</div></div>
+          <div class="metric-cell mc-blue"><div class="metric-label">Oportunidades</div><div class="metric-value mv-blue">{nc+nv}</div><div class="metric-sub">{nc} compra · {nv} venta</div></div>
+        </div></div>""", unsafe_allow_html=True)
 
-                d_c = f"{'▲' if prev_uc is None or uc>=prev_uc else '▼'} ${abs(uc-(prev_uc or uc)):,.2f}" if prev_uc is not None else "sesión actual"
-                d_v = f"{'▲' if prev_uv is None or uv>=prev_uv else '▼'} ${abs(uv-(prev_uv or uv)):,.2f}" if prev_uv is not None else "sesión actual"
-                prev_uc, prev_uv = uc, uv
-                st.session_state.prev_uc = uc
-                st.session_state.prev_uv = uv
+        # Tablas Monitor
+        header_c_ph.markdown(f'<div style="padding:0 24px"><div class="tbl-header"><span class="tbl-tag tag-c">▲ Compra</span><span class="tbl-meta">{nc} oportunidades activas</span><span class="tbl-total tt-green">${uc:,.2f} utilidad total</span></div></div>', unsafe_allow_html=True)
+        h_c, html_c = build_monitor_table(compra_records, "compra")
+        with table_c_ph:
+            components.html(html_c, height=h_c, scrolling=False)
 
-                st.markdown(f"""<div class="content">
-                <div class="metric-strip">
-                  <div class="metric-cell mc-gold"><div class="metric-label">Utilidad Compra</div><div class="metric-value mv-gold">${uc:,.2f}</div><div class="metric-sub">{d_c}</div></div>
-                  <div class="metric-cell mc-purple"><div class="metric-label">Utilidad Venta</div><div class="metric-value mv-purple">${uv:,.2f}</div><div class="metric-sub">{d_v}</div></div>
-                  <div class="metric-cell mc-green"><div class="metric-label">Mejor Rendimiento</div><div class="metric-value mv-green">{rmax*100:.3f}%</div><div class="metric-sub">top oportunidad</div></div>
-                  <div class="metric-cell mc-teal"><div class="metric-label">Capital Requerido</div><div class="metric-value mv-teal">${inv:,.0f}</div><div class="metric-sub">inversión compras</div></div>
-                  <div class="metric-cell mc-blue"><div class="metric-label">Oportunidades</div><div class="metric-value mv-blue">{nc+nv}</div><div class="metric-sub">{nc} compra · {nv} venta</div></div>
-                </div>""", unsafe_allow_html=True)
+        spacer_ph.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
 
-                st.markdown(f'<div class="tbl-header"><span class="tbl-tag tag-c">▲ Compra</span><span class="tbl-meta">{nc} oportunidades</span><span class="tbl-total tt-green">${uc:,.2f}</span></div>', unsafe_allow_html=True)
-                h_c, html_c = build_monitor_table(compra_records, "compra")
-                components.html(html_c, height=h_c, scrolling=False)
+        header_v_ph.markdown(f'<div style="padding:0 24px"><div class="tbl-header"><span class="tbl-tag tag-v">▼ Venta</span><span class="tbl-meta">{nv} oportunidades activas</span><span class="tbl-total tt-purple">${uv:,.2f} utilidad total</span></div></div>', unsafe_allow_html=True)
+        h_v, html_v = build_monitor_table(venta_records, "venta")
+        with table_v_ph:
+            components.html(html_v, height=h_v, scrolling=False)
 
-                st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+    # ── COTIZADOR ─────────────────────────────────────────────────────────────
+    fx = calc.get("fx", {})
+    fx_bid = fx.get("bid"); fx_ask = fx.get("ask")
+    fx_bid_usd = fx.get("bid_usd"); fx_ask_usd = fx.get("ask_usd")
 
-                st.markdown(f'<div class="tbl-header"><span class="tbl-tag tag-v">▼ Venta</span><span class="tbl-meta">{nv} oportunidades</span><span class="tbl-total tt-purple">${uv:,.2f}</span></div>', unsafe_allow_html=True)
-                h_v, html_v = build_monitor_table(venta_records, "venta")
-                components.html(html_v, height=h_v, scrolling=False)
-                st.markdown("</div>", unsafe_allow_html=True)
+    fx_ph.markdown(f"""
+    <div class="fx-bar">
+      <div class="fx-title">MXN / USD</div>
+      <div class="fx-sep"></div>
+      <div><div class="fx-label">BID</div><div class="fx-val fx-bid">{"${:.4f}".format(fx_bid) if fx_bid else "—"}</div></div>
+      <div><div class="fx-label">ASK</div><div class="fx-val fx-ask">{"${:.4f}".format(fx_ask) if fx_ask else "—"}</div></div>
+      <div class="fx-sep"></div>
+      <div><div class="fx-label">BID USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx_bid_usd) if fx_bid_usd else "—"}</div></div>
+      <div><div class="fx-label">ASK USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx_ask_usd) if fx_ask_usd else "—"}</div></div>
+    </div>""", unsafe_allow_html=True)
 
-        # ── TAB 2: COTIZADOR ──────────────────────────────────────────────────
-        with tab2:
-            st.markdown('<div class="cot-wrap">', unsafe_allow_html=True)
-            fx = calc.get("fx", {})
-            fx_bid = fx.get("bid"); fx_ask = fx.get("ask")
-            fx_bid_usd = fx.get("bid_usd"); fx_ask_usd = fx.get("ask_usd")
+    fijo = calc.get("fijo", [])
+    edit = calc.get("editable", [])
 
-            st.markdown(f"""
-            <div class="fx-bar">
-              <div class="fx-title">MXN / USD</div>
-              <div class="fx-sep"></div>
-              <div><div class="fx-label">BID</div><div class="fx-val fx-bid">{"${:.4f}".format(fx_bid) if fx_bid else "—"}</div></div>
-              <div><div class="fx-label">ASK</div><div class="fx-val fx-ask">{"${:.4f}".format(fx_ask) if fx_ask else "—"}</div></div>
-              <div class="fx-sep"></div>
-              <div><div class="fx-label">BID USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx_bid_usd) if fx_bid_usd else "—"}</div></div>
-              <div><div class="fx-label">ASK USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx_ask_usd) if fx_ask_usd else "—"}</div></div>
-            </div>""", unsafe_allow_html=True)
+    if fijo:
+        hf, htmlf = build_cotizador_table(fijo)
+        with fijo_ph:
+            components.html(htmlf, height=hf, scrolling=False)
+    else:
+        fijo_ph.markdown('<div style="color:#3a5272;font-size:11px;padding:20px">Sin datos</div>', unsafe_allow_html=True)
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown('<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:#4a6280;text-transform:uppercase;padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">Emisoras Fijas</div>', unsafe_allow_html=True)
-                fijo = calc.get("fijo", [])
-                if fijo:
-                    hf, htmlf = build_cotizador_table(fijo)
-                    components.html(htmlf, height=hf, scrolling=False)
-                else:
-                    st.markdown('<div style="color:#3a5272;font-size:11px;padding:20px">Sin datos</div>', unsafe_allow_html=True)
-
-            with col2:
-                st.markdown('<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:#4a6280;text-transform:uppercase;padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">Cotización Manual (A10:A20)</div>', unsafe_allow_html=True)
-                edit = calc.get("editable", [])
-                if edit:
-                    he, htmle = build_cotizador_table(edit)
-                    components.html(htmle, height=he, scrolling=False)
-                else:
-                    st.markdown('<div style="color:#3a5272;font-size:11px;padding:20px">Escribe una emisora en A10:A20 del Excel</div>', unsafe_allow_html=True)
-
-            st.markdown('</div>', unsafe_allow_html=True)
+    if edit:
+        he, htmle = build_cotizador_table(edit)
+        with edit_ph:
+            components.html(htmle, height=he, scrolling=False)
+    else:
+        edit_ph.markdown('<div style="color:#3a5272;font-size:11px;padding:20px">Escribe una emisora en A10:A20 del Excel</div>', unsafe_allow_html=True)
 
     # ── FOOTER ────────────────────────────────────────────────────────────────
-    with foot_ph.container():
-        st.markdown(f"""
-        <div class="footer-bar">
-          <div class="footer-item"><span class="fi-label">PLATAFORMA</span><span class="fi-value">Composite Man · Arbitrage Intelligence</span></div>
-          <div class="footer-item"><span class="fi-label">APP RECARGADA</span><span class="fi-value">{now_full} CDMX</span></div>
-          <div class="footer-item"><span class="fi-label">BLOOMBERG ACTUALIZÓ</span><span class="fi-value">{last_update} CDMX</span></div>
-          <div class="footer-item"><span class="fi-label">LATENCIA SERVIDOR</span><span class="fi-value">⚡ {latency_ms}ms</span></div>
-          <div class="footer-item"><span class="fi-label">ITER</span><span class="fi-value">#{iteration} · {refresh_sec}s</span></div>
-        </div>""", unsafe_allow_html=True)
+    foot_ph.markdown(f"""
+    <div class="footer-bar">
+      <div class="footer-item"><span class="fi-label">PLATAFORMA</span><span class="fi-value">Composite Man · Arbitrage Intelligence</span></div>
+      <div class="footer-item"><span class="fi-label">APP RECARGADA</span><span class="fi-value">{now_full} CDMX</span></div>
+      <div class="footer-item"><span class="fi-label">BLOOMBERG ACTUALIZÓ</span><span class="fi-value">{last_update} CDMX</span></div>
+      <div class="footer-item"><span class="fi-label">LATENCIA</span><span class="fi-value">⚡ {latency_ms}ms</span></div>
+    </div>""", unsafe_allow_html=True)
 
-    time.sleep(refresh_sec)
-    st.rerun()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ARRANCAR
+# ─────────────────────────────────────────────────────────────────────────────
+update_data()
