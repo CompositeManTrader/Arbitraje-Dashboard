@@ -136,7 +136,10 @@ def fetch_all():
         r = requests.get(
             f"{SERVER_URL.rstrip('/')}/data",
             timeout=5,
-            headers={"ngrok-skip-browser-warning": "true"}
+            headers={
+                "ngrok-skip-browser-warning": "true",
+                "User-Agent": "CompositeMan-Streamlit/1.0",
+            }
         )
         if r.status_code == 200:
             data = r.json()
