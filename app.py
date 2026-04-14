@@ -1,12 +1,13 @@
 """
-app.py — Sube a Streamlit Cloud
-================================
-Lee los CSV desde GitHub y muestra el Monitor de Arbitraje en tiempo real.
+app.py — Monitor Arbitraje Intradía
+=====================================
+Bloomberg-style dashboard. Lee CSV desde GitHub en tiempo real.
+GITHUB_REPO debe coincidir con tu repositorio.
 """
 
 import time
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pandas as pd
 import requests
@@ -15,103 +16,236 @@ import streamlit as st
 # ─────────────────────────────────────────────────────────────────────────────
 # ★ EDITA ESTE VALOR ★
 # ─────────────────────────────────────────────────────────────────────────────
-GITHUB_REPO = "CompositeManTrader/Arbitraje-Dashboard"  # igual que en uploader.py
+GITHUB_REPO = "CompositeManTrader/Arbitraje-Dashboard"
 BRANCH      = "main"
 # ─────────────────────────────────────────────────────────────────────────────
 
-BASE_RAW = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{BRANCH}"
+BASE_RAW    = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{BRANCH}"
+STALE_SECS  = 30   # segundos sin actualización → alerta amarilla
+DEAD_SECS   = 120  # segundos sin actualización → alerta roja
 
 st.set_page_config(
-    page_title="Monitor Arbitraje",
-    page_icon="📈",
+    page_title="Arbitraje Monitor",
+    page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CSS — Bloomberg Terminal Style
+# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'IBM Plex Sans', sans-serif;
-    background-color: #0a0e1a;
-    color: #c8d0e0;
+*, html, body, [class*="css"] {
+    font-family: 'Space Grotesk', sans-serif !important;
+    box-sizing: border-box;
 }
-.stApp { background-color: #0a0e1a; }
+.stApp {
+    background: #070b14 !important;
+    color: #d4dce8 !important;
+}
+.block-container { padding: 1.2rem 1.8rem 2rem 1.8rem !important; max-width: 100% !important; }
 
-.monitor-header {
+/* ── TOP BAR ── */
+.topbar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 0 18px 0;
-    border-bottom: 1px solid #1e2d4a;
-    margin-bottom: 20px;
+    background: #0c1220;
+    border: 1px solid #1a2640;
+    border-radius: 8px;
+    padding: 10px 20px;
+    margin-bottom: 16px;
 }
-.monitor-title {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 22px; font-weight: 600;
-    color: #4fc3f7; letter-spacing: 2px;
+.topbar-left { display: flex; align-items: center; gap: 16px; }
+.topbar-logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 600;
+    color: #f0a500;
+    letter-spacing: 3px;
+    background: #1a1200;
+    border: 1px solid #3d2800;
+    padding: 4px 10px;
+    border-radius: 4px;
 }
-.monitor-subtitle { font-size: 12px; color: #546e8a; letter-spacing: 1px; }
-.live-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: #0d1f0d; border: 1px solid #1b5e20;
-    padding: 4px 12px; border-radius: 20px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #4caf50;
+.topbar-title {
+    font-size: 15px; font-weight: 600;
+    color: #e8eef5; letter-spacing: 0.5px;
 }
-.live-dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: #4caf50;
-    animation: pulse 1.4s ease-in-out infinite;
+.topbar-sub {
+    font-size: 11px; color: #4a6080; letter-spacing: 1px;
+    font-family: 'JetBrains Mono', monospace;
 }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
 
-.section-badge {
-    display: inline-block; padding: 4px 16px; border-radius: 3px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px; font-weight: 600; letter-spacing: 2px; margin-bottom: 10px;
+/* ── STATUS BADGES ── */
+.status-live {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #061a0a; border: 1px solid #0d4a1a;
+    padding: 5px 14px; border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; color: #00e676;
+    letter-spacing: 1px;
 }
-.badge-compra { background:#0d2137; color:#4fc3f7; border-left:3px solid #4fc3f7; }
-.badge-venta  { background:#1a0d24; color:#ce93d8; border-left:3px solid #ce93d8; }
+.status-warn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #1a1200; border: 1px solid #4d3800;
+    padding: 5px 14px; border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; color: #ffab00;
+    letter-spacing: 1px;
+}
+.status-dead {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #1a0608; border: 1px solid #4d0e14;
+    padding: 5px 14px; border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; color: #ff1744;
+    letter-spacing: 1px;
+}
+.dot-live { width:8px; height:8px; border-radius:50%; background:#00e676;
+    box-shadow: 0 0 6px #00e676;
+    animation: blink 1.4s ease-in-out infinite; }
+.dot-warn { width:8px; height:8px; border-radius:50%; background:#ffab00;
+    box-shadow: 0 0 6px #ffab00;
+    animation: blink 0.7s ease-in-out infinite; }
+.dot-dead { width:8px; height:8px; border-radius:50%; background:#ff1744; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
 
-.stat-row { display: flex; gap: 12px; margin-bottom: 20px; }
-.stat-card {
-    flex: 1; background: #0f1729; border: 1px solid #1e2d4a;
-    border-radius: 6px; padding: 12px 16px;
+/* ── ALERT BANNER ── */
+.alert-warn {
+    background: #1a1200; border-left: 3px solid #ffab00;
+    border-radius: 0 6px 6px 0; padding: 10px 16px;
+    margin-bottom: 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #ffab00;
 }
-.stat-label { font-size: 10px; color: #546e8a; letter-spacing: 1px; text-transform: uppercase; }
-.stat-value { font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; color:#e0e8f0; }
-.stat-value.green  { color: #4caf50; }
-.stat-value.purple { color: #ce93d8; }
-.stat-value.blue   { color: #4fc3f7; }
+.alert-dead {
+    background: #1a0608; border-left: 3px solid #ff1744;
+    border-radius: 0 6px 6px 0; padding: 10px 16px;
+    margin-bottom: 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #ff5252;
+}
 
-.ts { font-family:'IBM Plex Mono',monospace; font-size:11px; color:#546e8a; }
-.err-box {
-    background:#1a0808; border:1px solid #5c1010; border-radius:6px;
-    padding:16px; margin:20px 0;
-    font-family:'IBM Plex Mono',monospace; font-size:12px; color:#ef9a9a;
+/* ── STAT CARDS ── */
+.cards-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
 }
+.card {
+    background: #0c1220;
+    border: 1px solid #1a2640;
+    border-radius: 8px;
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+}
+.card::before {
+    content: '';
+    position: absolute; top:0; left:0; right:0; height:2px;
+}
+.card.blue::before  { background: linear-gradient(90deg, #0066ff, #00aaff); }
+.card.green::before { background: linear-gradient(90deg, #00c853, #69f0ae); }
+.card.purple::before{ background: linear-gradient(90deg, #aa00ff, #e040fb); }
+.card.gold::before  { background: linear-gradient(90deg, #f0a500, #ffd740); }
+.card.teal::before  { background: linear-gradient(90deg, #00bcd4, #80deea); }
+
+.card-label {
+    font-size: 9px; font-weight: 600;
+    color: #3a5070; letter-spacing: 1.5px;
+    text-transform: uppercase; margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px; font-weight: 600; color: #e8eef5;
+    line-height: 1;
+}
+.card-value.blue   { color: #40aaff; }
+.card-value.green  { color: #00e676; }
+.card-value.purple { color: #e040fb; }
+.card-value.gold   { color: #ffd740; }
+.card-value.teal   { color: #80deea; }
+.card-delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: #3a5070; margin-top: 4px;
+}
+
+/* ── SECTION HEADERS ── */
+.section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin: 18px 0 8px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1a2640;
+}
+.section-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 600; letter-spacing: 2px;
+    padding: 3px 10px; border-radius: 3px;
+}
+.tag-compra { background: #001833; color: #40aaff; border: 1px solid #0044aa; }
+.tag-venta  { background: #1a0033; color: #e040fb; border: 1px solid #6600aa; }
+.section-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: #3a5070;
+}
+.section-total {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 600; margin-left: auto;
+}
+.total-green  { color: #00e676; }
+.total-purple { color: #e040fb; }
+
+/* ── DATAFRAME OVERRIDES ── */
+.stDataFrame { background: transparent !important; }
+[data-testid="stDataFrame"] > div {
+    border: 1px solid #1a2640 !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+}
+iframe { background: #0c1220 !important; }
+
+/* ── TIMESTAMP BAR ── */
+.ts-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 14px; padding-top: 10px;
+    border-top: 1px solid #0f1a2e;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: #2a4060; letter-spacing: 0.5px;
+}
+
+/* ── SIDEBAR ── */
+section[data-testid="stSidebar"] {
+    background: #080e1a !important;
+    border-right: 1px solid #1a2640 !important;
+}
+
+/* ── HIDE STREAMLIT UI ── */
 #MainMenu, footer, header { visibility: hidden; }
+.stDeployButton { display: none; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FETCH desde GitHub raw (con cache corto)
+# DATA FETCHERS
 # ─────────────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=4)
-def fetch_csv(filename: str) -> pd.DataFrame | None:
-    url = f"{BASE_RAW}/{filename}"
+def fetch_csv(filename: str):
+    url = f"{BASE_RAW}/{filename}?t={int(time.time())}"
     try:
         r = requests.get(url, timeout=8)
         if r.status_code == 200:
             from io import StringIO
             return pd.read_csv(StringIO(r.text))
-        return None
     except Exception:
-        return None
+        pass
+    return None
 
 @st.cache_data(ttl=4)
 def fetch_meta() -> dict:
-    url = f"{BASE_RAW}/data/meta.json"
+    url = f"{BASE_RAW}/data/meta.json?t={int(time.time())}"
     try:
         r = requests.get(url, timeout=8)
         if r.status_code == 200:
@@ -125,31 +259,35 @@ def fetch_meta() -> dict:
 # FORMATTERS
 # ─────────────────────────────────────────────────────────────────────────────
 def fmt_peso(val):
-    if pd.isna(val): return "—"
-    return f"${val:,.2f}"
+    try:
+        v = float(val)
+        return f"${v:,.2f}"
+    except: return "—"
 
 def fmt_pct(val):
-    if pd.isna(val): return "—"
-    return f"{val*100:.2f}%"
+    try:
+        v = float(val)
+        arrow = "▲" if v >= 0 else "▼"
+        return f"{arrow} {abs(v)*100:.2f}%"
+    except: return "—"
 
 def fmt_int(val):
-    if pd.isna(val): return "—"
-    try: return f"{int(val):,}"
-    except: return str(val)
+    try: return f"{int(float(val)):,}"
+    except: return "—"
 
 def prepare_display(df: pd.DataFrame) -> pd.DataFrame:
     out = pd.DataFrame()
-    out["#"]           = pd.to_numeric(df["#"], errors="coerce").astype("Int64")
-    out["Ticker"]      = df["TICKER"]
-    out["Empresa"]     = df["Empresa"]
-    out["Operación"]   = df["Operación"]
-    out["Títulos"]     = df["Títulos"].apply(fmt_int)
-    out["Diferencia"]  = df["Diferencia"].apply(fmt_peso)
-    out["Justo"]       = df["Justo"].apply(fmt_peso)
-    out["Rendimiento"] = df["Rendimiento"].apply(fmt_pct)
-    out["Utilidad $"]  = df["Utilidad"].apply(fmt_peso)
-    out["Inversión"]   = df["Inversión"].apply(fmt_peso)
-    out["País"]        = df["País"].astype(str).str.strip()
+    out["#"]            = pd.to_numeric(df["#"], errors="coerce").astype("Int64")
+    out["Ticker"]       = df["TICKER"]
+    out["Empresa"]      = df["Empresa"]
+    out["Operación"]    = df["Operación"]
+    out["Títulos"]      = df["Títulos"].apply(fmt_int)
+    out["Diferencia"]   = df["Diferencia"].apply(fmt_peso)
+    out["Precio Justo"] = df["Justo"].apply(fmt_peso)
+    out["Rdto %"]       = df["Rendimiento"].apply(fmt_pct)
+    out["Utilidad $"]   = df["Utilidad"].apply(fmt_peso)
+    out["Inversión"]    = df["Inversión"].apply(fmt_peso)
+    out["País"]         = df["País"].astype(str).str.strip()
     return out
 
 
@@ -158,141 +296,231 @@ def prepare_display(df: pd.DataFrame) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚙️ Configuración")
-    st.markdown("---")
     refresh_sec = st.slider("Refresco (seg)", 3, 60, 5, 1)
     st.markdown("---")
-    st.markdown(f"**Fuente de datos**")
-    st.code(f"github.com/{GITHUB_REPO}", language=None)
-    st.markdown("---")
-    meta_ph = st.empty()
+    st.code(f"Repo:\n{GITHUB_REPO}", language=None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PLACEHOLDERS
 # ─────────────────────────────────────────────────────────────────────────────
-header_ph  = st.empty()
-stats_ph   = st.empty()
+topbar_ph  = st.empty()
+alert_ph   = st.empty()
+cards_ph   = st.empty()
 compra_ph  = st.empty()
 venta_ph   = st.empty()
 ts_ph      = st.empty()
 
-iteration = 0
+iteration  = 0
+prev_compra_util = None
+prev_venta_util  = None
 
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN LOOP
+# ─────────────────────────────────────────────────────────────────────────────
 while True:
     iteration += 1
-    now = datetime.now().strftime("%Y-%m-%d  %H:%M:%S")
+    now_str = datetime.now().strftime("%H:%M:%S")
+    now_full = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    df_compra = fetch_csv("data/compra.csv")
-    df_venta  = fetch_csv("data/venta.csv")
-    meta      = fetch_meta()
+    df_c  = fetch_csv("data/compra.csv")
+    df_v  = fetch_csv("data/venta.csv")
+    meta  = fetch_meta()
 
-    # ── HEADER ────────────────────────────────────────────────────────────────
-    with header_ph.container():
+    # ── CALCULAR ESTADO DE CONEXIÓN ───────────────────────────────────────────
+    last_update = meta.get("last_update", "")
+    secs_ago    = 9999
+    secs_ago_str = "—"
+
+    if last_update:
+        try:
+            lu = datetime.strptime(last_update, "%Y-%m-%d %H:%M:%S")
+            secs_ago = (datetime.now() - lu).total_seconds()
+            if secs_ago < 60:
+                secs_ago_str = f"{int(secs_ago)}s"
+            else:
+                secs_ago_str = f"{int(secs_ago/60)}m {int(secs_ago%60)}s"
+        except Exception:
+            pass
+
+    if df_c is None or df_v is None:
+        conn_status = "no_data"
+    elif secs_ago > DEAD_SECS:
+        conn_status = "dead"
+    elif secs_ago > STALE_SECS:
+        conn_status = "warn"
+    else:
+        conn_status = "live"
+
+    # ── STATUS BADGE HTML ─────────────────────────────────────────────────────
+    if conn_status == "live":
+        badge = '<span class="status-live"><span class="dot-live"></span>EN VIVO · Bloomberg</span>'
+    elif conn_status == "warn":
+        badge = f'<span class="status-warn"><span class="dot-warn"></span>SIN CAMBIOS · {secs_ago_str}</span>'
+    elif conn_status == "dead":
+        badge = f'<span class="status-dead"><span class="dot-dead"></span>DESCONECTADO · {secs_ago_str}</span>'
+    else:
+        badge = '<span class="status-dead"><span class="dot-dead"></span>SIN DATOS</span>'
+
+    # ── TOPBAR ────────────────────────────────────────────────────────────────
+    with topbar_ph.container():
         st.markdown(f"""
-        <div class="monitor-header">
-            <div>
-                <div class="monitor-title">◈ MONITOR ARBITRAJE INTRADÍA</div>
-                <div class="monitor-subtitle">BMV · BIVA · NYSE · NASDAQ — Monitor $</div>
+        <div class="topbar">
+            <div class="topbar-left">
+                <div class="topbar-logo">ARB</div>
+                <div>
+                    <div class="topbar-title">Monitor de Arbitraje Intradía</div>
+                    <div class="topbar-sub">BMV &nbsp;·&nbsp; BIVA &nbsp;·&nbsp; NYSE &nbsp;·&nbsp; NASDAQ &nbsp;·&nbsp; Monitor $</div>
+                </div>
             </div>
-            <div>
-                <span class="live-badge">
-                    <span class="live-dot"></span>
-                    EN VIVO · Bloomberg → GitHub
-                </span>
+            <div class="topbar-right">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#3a5070;">
+                    {now_str}
+                </div>
+                {badge}
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-    # ── ERROR ─────────────────────────────────────────────────────────────────
-    if df_compra is None or df_venta is None:
-        with stats_ph.container():
+    # ── ALERT BANNER ──────────────────────────────────────────────────────────
+    with alert_ph.container():
+        if conn_status == "warn":
             st.markdown(f"""
-            <div class="err-box">
-                ⚠ No se encontraron datos en GitHub.<br><br>
-                Verifica que el <strong>uploader.py</strong> esté corriendo
-                en la PC con Bloomberg y que el repositorio sea:<br>
-                <strong>{GITHUB_REPO}</strong>
+            <div class="alert-warn">
+                ⚠ &nbsp; Bloomberg dejó de actualizar hace <strong>{secs_ago_str}</strong>.
+                Verifica que el Excel esté abierto y el autoguardado activo.
+                Último dato: <strong>{last_update}</strong>
             </div>
             """, unsafe_allow_html=True)
+        elif conn_status == "dead":
+            st.markdown(f"""
+            <div class="alert-dead">
+                ✖ &nbsp; Conexión perdida hace <strong>{secs_ago_str}</strong>.
+                Posibles causas: PC Bloomberg apagada · Internet caído · uploader.py cerrado.
+                Último dato recibido: <strong>{last_update}</strong>
+            </div>
+            """, unsafe_allow_html=True)
+        elif conn_status == "no_data":
+            st.markdown(f"""
+            <div class="alert-dead">
+                ✖ &nbsp; No se encontraron datos en GitHub.
+                Verifica que <strong>uploader.py</strong> esté corriendo
+                en la PC con Bloomberg. Repo: <strong>{GITHUB_REPO}</strong>
+            </div>
+            """, unsafe_allow_html=True)
+
+    if conn_status == "no_data":
         time.sleep(refresh_sec)
-        fetch_csv.clear()
-        fetch_meta.clear()
+        fetch_csv.clear(); fetch_meta.clear()
         continue
 
-    # ── SIDEBAR META ──────────────────────────────────────────────────────────
-    with meta_ph.container():
-        if meta:
-            st.markdown(f"""
-            **Última actualización Bloomberg:**  
-            `{meta.get('last_update','—')}`  
-            Compras: `{meta.get('rows_compra','—')}` · Ventas: `{meta.get('rows_venta','—')}`
-            """)
+    # ── CALCULAR MÉTRICAS ─────────────────────────────────────────────────────
+    util_c    = pd.to_numeric(df_c["Utilidad"],    errors="coerce").sum()
+    util_v    = pd.to_numeric(df_v["Utilidad"],    errors="coerce").sum()
+    inv_c     = pd.to_numeric(df_c["Inversión"],   errors="coerce").sum()
+    rend_max  = pd.to_numeric(df_c["Rendimiento"], errors="coerce").max()
 
-    # ── STATS CARDS ───────────────────────────────────────────────────────────
-    util_compra = pd.to_numeric(df_compra["Utilidad"], errors="coerce").sum()
-    util_venta  = pd.to_numeric(df_venta["Utilidad"],  errors="coerce").sum()
-    rend_max    = pd.to_numeric(df_compra["Rendimiento"], errors="coerce").max()
+    delta_c = ""
+    delta_v = ""
+    if prev_compra_util is not None:
+        d = util_c - prev_compra_util
+        delta_c = f"{'▲' if d>=0 else '▼'} ${abs(d):,.2f} vs anterior"
+    if prev_venta_util is not None:
+        d = util_v - prev_venta_util
+        delta_v = f"{'▲' if d>=0 else '▼'} ${abs(d):,.2f} vs anterior"
+    prev_compra_util = util_c
+    prev_venta_util  = util_v
 
-    with stats_ph.container():
+    # ── CARDS ─────────────────────────────────────────────────────────────────
+    with cards_ph.container():
         st.markdown(f"""
-        <div class="stat-row">
-            <div class="stat-card">
-                <div class="stat-label">Oportunidades Compra</div>
-                <div class="stat-value blue">{len(df_compra)}</div>
+        <div class="cards-row">
+            <div class="card blue">
+                <div class="card-label">Oportunidades Compra</div>
+                <div class="card-value blue">{len(df_c)}</div>
+                <div class="card-delta">operaciones activas</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Utilidad Total Compra</div>
-                <div class="stat-value green">${util_compra:,.2f}</div>
+            <div class="card green">
+                <div class="card-label">Utilidad Total Compra</div>
+                <div class="card-value green">${util_c:,.2f}</div>
+                <div class="card-delta">{delta_c or 'acumulado sesión'}</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Oportunidades Venta</div>
-                <div class="stat-value purple">{len(df_venta)}</div>
+            <div class="card purple">
+                <div class="card-label">Utilidad Total Venta</div>
+                <div class="card-value purple">${util_v:,.2f}</div>
+                <div class="card-delta">{delta_v or 'acumulado sesión'}</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Utilidad Total Venta</div>
-                <div class="stat-value purple">${util_venta:,.2f}</div>
+            <div class="card gold">
+                <div class="card-label">Mejor Rendimiento</div>
+                <div class="card-value gold">{rend_max*100:.2f}%</div>
+                <div class="card-delta">top oportunidad</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Mejor Rendimiento</div>
-                <div class="stat-value green">{rend_max*100:.2f}%</div>
+            <div class="card teal">
+                <div class="card-label">Capital en Compras</div>
+                <div class="card-value teal">${inv_c:,.0f}</div>
+                <div class="card-delta">inversión requerida</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
     COL_CONFIG = {
-        "#":          st.column_config.NumberColumn("#", width=40),
-        "Ticker":     st.column_config.TextColumn("TICKER", width=90),
-        "Empresa":    st.column_config.TextColumn("Empresa", width=230),
-        "Operación":  st.column_config.TextColumn("Operación", width=155),
-        "Títulos":    st.column_config.TextColumn("Títulos", width=80),
-        "Diferencia": st.column_config.TextColumn("Diferencia", width=105),
-        "Justo":      st.column_config.TextColumn("Justo", width=115),
-        "Rendimiento":st.column_config.TextColumn("Rendimiento", width=105),
-        "Utilidad $": st.column_config.TextColumn("Utilidad $", width=115),
-        "Inversión":  st.column_config.TextColumn("Inversión", width=135),
-        "País":       st.column_config.TextColumn("País", width=120),
+        "#":            st.column_config.NumberColumn("#", width=45),
+        "Ticker":       st.column_config.TextColumn("Ticker", width=85),
+        "Empresa":      st.column_config.TextColumn("Empresa", width=230),
+        "Operación":    st.column_config.TextColumn("Operación", width=155),
+        "Títulos":      st.column_config.TextColumn("Títulos", width=75),
+        "Diferencia":   st.column_config.TextColumn("Diferencia", width=105),
+        "Precio Justo": st.column_config.TextColumn("Precio Justo", width=115),
+        "Rdto %":       st.column_config.TextColumn("Rdto %", width=100),
+        "Utilidad $":   st.column_config.TextColumn("Utilidad $", width=110),
+        "Inversión":    st.column_config.TextColumn("Inversión", width=130),
+        "País":         st.column_config.TextColumn("País", width=115),
     }
 
     # ── TABLA COMPRA ──────────────────────────────────────────────────────────
     with compra_ph.container():
-        st.markdown('<span class="section-badge badge-compra">▲ COMPRA</span>', unsafe_allow_html=True)
-        st.dataframe(prepare_display(df_compra), use_container_width=True,
-                     hide_index=True, column_config=COL_CONFIG)
+        st.markdown(f"""
+        <div class="section-header">
+            <span class="section-tag tag-compra">▲ COMPRA</span>
+            <span class="section-count">{len(df_c)} oportunidades</span>
+            <span class="section-total total-green">${util_c:,.2f} utilidad total</span>
+        </div>
+        """, unsafe_allow_html=True)
+        st.dataframe(
+            prepare_display(df_c),
+            use_container_width=True,
+            hide_index=True,
+            column_config=COL_CONFIG,
+            height=min(35 * len(df_c) + 38, 450),
+        )
 
     # ── TABLA VENTA ───────────────────────────────────────────────────────────
     with venta_ph.container():
-        st.markdown('<span class="section-badge badge-venta">▼ VENTA</span>', unsafe_allow_html=True)
-        st.dataframe(prepare_display(df_venta), use_container_width=True,
-                     hide_index=True, column_config=COL_CONFIG)
-
-    # ── TIMESTAMP ─────────────────────────────────────────────────────────────
-    with ts_ph.container():
-        bbg_ts = meta.get("last_update", "—")
-        st.markdown(
-            f'<div class="ts">⟳ App recargada: {now} &nbsp;|&nbsp; '
-            f'Bloomberg actualizó: {bbg_ts} &nbsp;|&nbsp; Iter #{iteration}</div>',
-            unsafe_allow_html=True
+        st.markdown(f"""
+        <div class="section-header">
+            <span class="section-tag tag-venta">▼ VENTA</span>
+            <span class="section-count">{len(df_v)} oportunidades</span>
+            <span class="section-total total-purple">${util_v:,.2f} utilidad total</span>
+        </div>
+        """, unsafe_allow_html=True)
+        st.dataframe(
+            prepare_display(df_v),
+            use_container_width=True,
+            hide_index=True,
+            column_config=COL_CONFIG,
+            height=min(35 * len(df_v) + 38, 450),
         )
+
+    # ── TIMESTAMP BAR ─────────────────────────────────────────────────────────
+    with ts_ph.container():
+        st.markdown(f"""
+        <div class="ts-bar">
+            <span>APP RECARGADA: {now_full}</span>
+            <span>BLOOMBERG ACTUALIZÓ: {last_update or '—'}</span>
+            <span>HACE: {secs_ago_str}</span>
+            <span>REFRESCO: {refresh_sec}s &nbsp;·&nbsp; ITER #{iteration}</span>
+        </div>
+        """, unsafe_allow_html=True)
 
     time.sleep(refresh_sec)
     fetch_csv.clear()
