@@ -1,8 +1,10 @@
 """
-app.py v6 — Monitor Arbitraje + Cotizador
+app.py v7 — Monitor Arbitraje + Cotizador
 ==========================================
-Dos pestañas: Monitor $ y Cotizador (hoja Calc).
-Refresco cada 1 segundo.
+Lee datos DIRECTO desde el servidor local via ngrok.
+Sin GitHub. Latencia ~500ms.
+
+EDITA SERVER_URL con la URL que te da ngrok.
 """
 
 import time, json
@@ -14,15 +16,13 @@ import requests
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ── EDITA ESTE VALOR ─────────────────────────────────────────────────────────
-GITHUB_REPO = "CompositeManTrader/Arbitraje-Dashboard"
-BRANCH      = "main"
+# ── EDITA ESTE VALOR con la URL que te da ngrok ───────────────────────────────
+SERVER_URL = " https://discount-angling-finale.ngrok-free.dev"   # <-- cambia esto
 # ─────────────────────────────────────────────────────────────────────────────
 
-BASE_RAW   = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{BRANCH}"
 CDMX       = ZoneInfo("America/Mexico_City")
-STALE_SECS = 30
-DEAD_SECS  = 120
+STALE_SECS = 15
+DEAD_SECS  = 45
 
 st.set_page_config(
     page_title="ARB · Composite Man",
@@ -49,43 +49,15 @@ section[data-testid="stSidebar"]{ background:var(--bg1) !important; border-right
 #MainMenu,footer,header,.stDeployButton{ visibility:hidden; display:none; }
 
 /* TABS */
-.stTabs [data-baseweb="tab-list"]{
-    background:var(--bg1) !important;
-    border-bottom:1px solid var(--border) !important;
-    padding:0 24px !important; gap:0 !important;
-}
-.stTabs [data-baseweb="tab"]{
-    background:transparent !important;
-    color:var(--text2) !important;
-    font-family:'Barlow Condensed',sans-serif !important;
-    font-size:13px !important; font-weight:600 !important;
-    letter-spacing:2px !important; text-transform:uppercase !important;
-    padding:14px 22px !important;
-    border-bottom:2px solid transparent !important;
-    border-radius:0 !important;
-}
-.stTabs [aria-selected="true"]{
-    color:var(--gold) !important;
-    border-bottom:2px solid var(--gold) !important;
-    background:transparent !important;
-}
+.stTabs [data-baseweb="tab-list"]{ background:var(--bg1) !important; border-bottom:1px solid var(--border) !important; padding:0 24px !important; gap:0 !important; }
+.stTabs [data-baseweb="tab"]{ background:transparent !important; color:var(--text2) !important; font-family:'Barlow Condensed',sans-serif !important; font-size:13px !important; font-weight:600 !important; letter-spacing:2px !important; text-transform:uppercase !important; padding:14px 22px !important; border-bottom:2px solid transparent !important; border-radius:0 !important; }
+.stTabs [aria-selected="true"]{ color:var(--gold) !important; border-bottom:2px solid var(--gold) !important; background:transparent !important; }
 .stTabs [data-baseweb="tab-panel"]{ padding:0 !important; }
 
 /* NAVBAR */
-.navbar{
-    display:flex; align-items:stretch;
-    background:var(--bg1); border-bottom:1px solid var(--border);
-    height:54px; padding:0 24px;
-    position:sticky; top:0; z-index:100;
-}
+.navbar{ display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--border); height:54px; padding:0 24px; position:sticky; top:0; z-index:100; }
 .nav-brand{ display:flex; align-items:center; gap:12px; padding-right:24px; border-right:1px solid var(--border); }
-.nav-logo{
-    width:34px; height:34px;
-    background:linear-gradient(135deg,var(--gold) 0%,#9a6800 100%);
-    border-radius:6px; display:flex; align-items:center; justify-content:center;
-    font-family:'Fira Code',monospace; font-size:12px; font-weight:700; color:#000;
-    box-shadow:0 0 14px rgba(232,184,75,.3);
-}
+.nav-logo{ width:34px; height:34px; background:linear-gradient(135deg,var(--gold) 0%,#9a6800 100%); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:'Fira Code',monospace; font-size:12px; font-weight:700; color:#000; box-shadow:0 0 14px rgba(232,184,75,.3); }
 .nav-name{ font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:700; color:var(--text0); letter-spacing:1px; text-transform:uppercase; }
 .nav-tagline{ font-size:9px; color:var(--text2); letter-spacing:2px; text-transform:uppercase; }
 .nav-markets{ display:flex; align-items:center; padding:0 4px; border-right:1px solid var(--border); }
@@ -100,9 +72,9 @@ section[data-testid="stSidebar"]{ background:var(--bg1) !important; border-right
 
 /* PILLS */
 .pill{ display:inline-flex; align-items:center; gap:7px; padding:5px 14px; border-radius:4px; font-family:'Fira Code',monospace; font-size:10px; font-weight:600; letter-spacing:1.5px; }
-.pill-live  { background:rgba(0,214,143,.08); border:1px solid rgba(0,214,143,.3); color:var(--green); }
-.pill-warn  { background:rgba(255,170,0,.08); border:1px solid rgba(255,170,0,.3); color:var(--amber); }
-.pill-dead  { background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.3);color:var(--red); }
+.pill-live{ background:rgba(0,214,143,.08); border:1px solid rgba(0,214,143,.3); color:var(--green); }
+.pill-warn{ background:rgba(255,170,0,.08); border:1px solid rgba(255,170,0,.3); color:var(--amber); }
+.pill-dead{ background:rgba(255,77,106,.08); border:1px solid rgba(255,77,106,.3); color:var(--red); }
 .pdot{ width:7px; height:7px; border-radius:50%; }
 .pdot-live{ background:var(--green); box-shadow:0 0 7px var(--green); animation:blink 1.6s ease infinite; }
 .pdot-warn{ background:var(--amber); box-shadow:0 0 7px var(--amber); animation:blink .7s ease infinite; }
@@ -121,94 +93,80 @@ section[data-testid="stSidebar"]{ background:var(--bg1) !important; border-right
 .metric-strip{ display:grid; grid-template-columns:repeat(5,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:22px; }
 .metric-cell{ background:var(--bg1); padding:14px 18px; position:relative; }
 .metric-cell::after{ content:''; position:absolute; bottom:0; left:18px; right:18px; height:2px; border-radius:2px 2px 0 0; opacity:.7; }
-.mc-gold::after  { background:linear-gradient(90deg,var(--gold),transparent); }
+.mc-gold::after{ background:linear-gradient(90deg,var(--gold),transparent); }
 .mc-purple::after{ background:linear-gradient(90deg,var(--purple),transparent); }
-.mc-green::after { background:linear-gradient(90deg,var(--green),transparent); }
-.mc-teal::after  { background:linear-gradient(90deg,var(--teal),transparent); }
-.mc-blue::after  { background:linear-gradient(90deg,var(--blue),transparent); }
+.mc-green::after{ background:linear-gradient(90deg,var(--green),transparent); }
+.mc-teal::after{ background:linear-gradient(90deg,var(--teal),transparent); }
+.mc-blue::after{ background:linear-gradient(90deg,var(--blue),transparent); }
 .metric-label{ font-family:'Fira Code',monospace; font-size:9px; color:var(--text3); letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
 .metric-value{ font-family:'Fira Code',monospace; font-size:21px; font-weight:600; line-height:1; }
 .mv-gold{color:var(--gold)} .mv-green{color:var(--green)} .mv-blue{color:var(--blue)} .mv-teal{color:var(--teal)} .mv-purple{color:var(--purple)}
 .metric-sub{ font-size:10px; color:var(--text2); margin-top:5px; }
 
-/* SECTION HEADER */
+/* TABLE HEADERS */
 .tbl-header{ display:flex; align-items:center; padding:0 0 10px 0; margin-bottom:2px; border-bottom:1px solid var(--border); }
 .tbl-tag{ font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:3px; text-transform:uppercase; padding:3px 12px 3px 10px; border-radius:3px; margin-right:12px; }
 .tag-c{ background:rgba(61,154,255,.1); color:var(--blue); border-left:3px solid var(--blue); }
 .tag-v{ background:rgba(176,96,255,.1); color:var(--purple); border-left:3px solid var(--purple); }
 .tbl-meta{ font-family:'Fira Code',monospace; font-size:10px; color:var(--text2); }
 .tbl-total{ margin-left:auto; font-family:'Fira Code',monospace; font-size:13px; font-weight:600; }
-.tt-green{ color:var(--green); } .tt-purple{ color:var(--purple); }
+.tt-green{color:var(--green)} .tt-purple{color:var(--purple)}
 
 /* FOOTER */
 .footer-bar{ display:flex; align-items:center; justify-content:space-between; padding:10px 24px; border-top:1px solid var(--border); background:var(--bg1); font-family:'Fira Code',monospace; font-size:9px; color:var(--text3); margin-top:12px; }
 .footer-item{ display:flex; flex-direction:column; gap:2px; }
 .fi-label{color:var(--text3)} .fi-value{color:var(--text2)}
 
-/* ── COTIZADOR ── */
+/* COTIZADOR */
 .cot-wrap{ padding:20px 24px; }
-.fx-bar{
-    display:flex; align-items:center; gap:24px;
-    background:var(--bg1); border:1px solid var(--border);
-    border-radius:8px; padding:14px 20px; margin-bottom:20px;
-}
+.fx-bar{ display:flex; align-items:center; gap:24px; background:var(--bg1); border:1px solid var(--border); border-radius:8px; padding:14px 20px; margin-bottom:20px; }
 .fx-label{ font-family:'Fira Code',monospace; font-size:9px; color:var(--text3); letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; }
 .fx-val{ font-family:'Fira Code',monospace; font-size:18px; font-weight:600; }
-.fx-bid{ color:var(--blue); }
-.fx-ask{ color:var(--yellow); }
+.fx-bid{color:var(--blue)} .fx-ask{color:var(--yellow)}
 .fx-sep{ width:1px; height:40px; background:var(--border); }
 .fx-title{ font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; color:var(--text2); letter-spacing:2px; text-transform:uppercase; margin-right:8px; }
+
+/* LATENCY BADGE */
+.lat-badge{ font-family:'Fira Code',monospace; font-size:10px; color:var(--green); background:rgba(0,214,143,.08); border:1px solid rgba(0,214,143,.2); padding:3px 10px; border-radius:4px; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DATA FETCHERS — ttl=1 para refresco cada segundo
+# FETCH DIRECTO DESDE SERVIDOR — sin cache, siempre fresco
 # ─────────────────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=1)
-def fetch_csv(filename):
-    url = f"{BASE_RAW}/{filename}?t={int(time.time())}"
+def fetch_all():
+    """Llama al servidor local via ngrok y trae todos los datos."""
+    t0 = time.time()
     try:
-        r = requests.get(url, timeout=6)
+        r = requests.get(
+            f"{SERVER_URL.rstrip('/')}/data",
+            timeout=5,
+            headers={"ngrok-skip-browser-warning": "true"}
+        )
         if r.status_code == 200:
-            from io import StringIO
-            return pd.read_csv(StringIO(r.text))
-    except Exception:
+            latency_ms = int((time.time() - t0) * 1000)
+            data = r.json()
+            data["latency_ms"] = latency_ms
+            return data
+    except Exception as e:
         pass
     return None
 
-@st.cache_data(ttl=1)
-def fetch_meta():
-    url = f"{BASE_RAW}/data/meta.json?t={int(time.time())}"
-    try:
-        r = requests.get(url, timeout=6)
-        if r.status_code == 200:
-            return r.json()
-    except Exception:
-        pass
-    return {}
 
-@st.cache_data(ttl=1)
-def fetch_calc():
-    url = f"{BASE_RAW}/data/calc.json?t={int(time.time())}"
-    try:
-        r = requests.get(url, timeout=6)
-        if r.status_code == 200:
-            return r.json()
-    except Exception:
-        pass
-    return None
+def cdmx_now():
+    return datetime.now(CDMX)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FORMATTERS
 # ─────────────────────────────────────────────────────────────────────────────
-def fp(v):
-    try: return f"${float(v):,.4f}"
-    except: return "—"
-
 def fp2(v):
     try: return f"${float(v):,.2f}"
+    except: return "—"
+
+def fp4(v):
+    try: return f"${float(v):,.4f}"
     except: return "—"
 
 def fpct(v):
@@ -230,20 +188,17 @@ def fi(v):
     try: return f"{int(float(v)):,}"
     except: return "—"
 
-def cdmx_now():
-    return datetime.now(CDMX)
-
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BUILD MONITOR TABLE (iframe)
+# BUILD MONITOR TABLE
 # ─────────────────────────────────────────────────────────────────────────────
-def build_table(df, tipo):
+def build_monitor_table(records, tipo):
     accent = "#3d9aff" if tipo == "compra" else "#b060ff"
-    nrows  = len(df)
-    height = nrows * 44 + 52
+    nrows  = max(len(records), 1)
+    height = nrows * 44 + 54
 
     rows = ""
-    for _, row in df.iterrows():
+    for row in records:
         op = str(row.get("Operación", row.get("Operacion", "")))
         if "BIVA" in op and "BMV" in op:
             badge = '<span class="badge badge-both">BMV+BIVA</span>'
@@ -257,16 +212,16 @@ def build_table(df, tipo):
             <td class="td-ticker">{row.get('TICKER','')}</td>
             <td class="td-empresa">{row.get('Empresa','')}</td>
             <td class="td-op">{badge}</td>
-            <td class="td-r">{fi(row.get('Títulos', row.get('Titulos','')))}</td>
-            <td class="td-r mono">{fp2(row.get('Diferencia'))}</td>
-            <td class="td-r mono">{fp2(row.get('Justo'))}</td>
-            <td class="td-r">{fpct(row.get('Rendimiento'))}</td>
-            <td class="td-r mono">{fu(row.get('Utilidad'))}</td>
-            <td class="td-r mono dim">{fp2(row.get('Inversión', row.get('Inversion','')))}</td>
+            <td class="td-r">{fi(row.get('Títulos', row.get('Titulos',0)))}</td>
+            <td class="td-r mono">{fp2(row.get('Diferencia',0))}</td>
+            <td class="td-r mono">{fp2(row.get('Justo',0))}</td>
+            <td class="td-r">{fpct(row.get('Rendimiento',0))}</td>
+            <td class="td-r mono">{fu(row.get('Utilidad',0))}</td>
+            <td class="td-r mono dim">{fp2(row.get('Inversión', row.get('Inversion',0)))}</td>
             <td class="td-pais">{str(row.get('País', row.get('Pais',''))).strip()}</td>
         </tr>"""
 
-    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+    return height, f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
@@ -274,9 +229,9 @@ html,body{{background:#04080f;color:#c8d8e8;font-family:'Barlow',sans-serif;font
 .wrap{{width:100%;border-radius:8px;border:1px solid #162035;background:#080e1c;overflow:hidden}}
 table{{width:100%;border-collapse:collapse;table-layout:fixed}}
 thead tr{{background:#0b1422;border-bottom:2px solid {accent}33}}
-thead th{{padding:10px 12px;font-family:'Fira Code',monospace;font-size:9px;font-weight:600;color:#3a5272;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid #162035}}
+thead th{{padding:10px 12px;font-family:'Fira Code',monospace;font-size:9px;font-weight:600;color:#3a5272;letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid #162035}}
 thead th.r{{text-align:right}} thead th.hi{{color:{accent};border-bottom:2px solid {accent}}}
-tbody tr{{border-bottom:1px solid #0d1624;transition:background .12s;cursor:default}}
+tbody tr{{border-bottom:1px solid #0d1624;transition:background .12s}}
 tbody tr:hover{{background:#0e1a2e}} tbody tr:last-child{{border-bottom:none}}
 td{{padding:9px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;color:#aabdd0}}
 col.c-num{{width:42px}} col.c-tick{{width:88px}} col.c-emp{{width:auto}}
@@ -306,35 +261,28 @@ col.c-inv{{width:118px}} col.c-pais{{width:126px}}
 <th class="r">Títulos</th><th class="r">Diferencia</th><th class="r">Precio Justo</th>
 <th class="r hi">Rdto %</th><th class="r hi">Utilidad $</th>
 <th class="r">Inversión</th><th>País</th>
-</tr></thead>
-<tbody>{rows}</tbody>
-</table></div></body></html>"""
-    return height, html
+</tr></thead><tbody>{rows}</tbody></table></div></body></html>"""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BUILD COTIZADOR TABLE (iframe)
+# BUILD COTIZADOR TABLE
 # ─────────────────────────────────────────────────────────────────────────────
-def build_cotizador_table(rows_data, titulo, accent_ask, accent_bid):
+def build_cotizador_table(rows_data):
     nrows  = max(len(rows_data), 1)
     height = nrows * 46 + 54
-
     rows = ""
     for r in rows_data:
-        em  = r.get("emisora", "—")
+        em  = r.get("emisora","—")
         ask = r.get("ask")
         bid = r.get("bid")
-        ask_str = f'<span style="color:{accent_ask};font-family:Fira Code,monospace;font-weight:700">{fp(ask)}</span>' if ask else '<span style="color:#283850">—</span>'
-        bid_str = f'<span style="color:{accent_bid};font-family:Fira Code,monospace;font-weight:700">{fp(bid)}</span>' if bid else '<span style="color:#283850">—</span>'
-
-        # spread
-        spread = ""
+        ask_str = f'<span style="color:#f5d020;font-family:Fira Code,monospace;font-weight:700">{fp4(ask)}</span>' if ask else '<span style="color:#283850">—</span>'
+        bid_str = f'<span style="color:#3d9aff;font-family:Fira Code,monospace;font-weight:700">{fp4(bid)}</span>' if bid else '<span style="color:#283850">—</span>'
+        spread  = ""
         if ask and bid:
             try:
                 s = float(ask) - float(bid)
                 spread = f'<span style="color:#4a6280;font-family:Fira Code,monospace;font-size:11px">${s:.4f}</span>'
             except: pass
-
         rows += f"""<tr>
             <td class="td-em">{em}</td>
             <td class="td-r">{ask_str}</td>
@@ -342,36 +290,29 @@ def build_cotizador_table(rows_data, titulo, accent_ask, accent_bid):
             <td class="td-r">{spread}</td>
         </tr>"""
 
-    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    return height, f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
-html,body{{background:#04080f;color:#c8d8e8;font-family:'Barlow',sans-serif;font-size:13px}}
+html,body{{background:#04080f;font-family:'Barlow',sans-serif;font-size:13px}}
 .wrap{{width:100%;border-radius:8px;border:1px solid #162035;background:#080e1c;overflow:hidden}}
 table{{width:100%;border-collapse:collapse;table-layout:fixed}}
 thead tr{{background:#0b1422}}
 thead th{{padding:10px 14px;font-family:'Fira Code',monospace;font-size:9px;font-weight:600;color:#3a5272;letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid #162035}}
 thead th.r{{text-align:right}}
-thead th.ask{{color:{accent_ask};border-bottom:2px solid {accent_ask}}}
-thead th.bid{{color:{accent_bid};border-bottom:2px solid {accent_bid}}}
+thead th.ask{{color:#f5d020;border-bottom:2px solid #f5d020}}
+thead th.bid{{color:#3d9aff;border-bottom:2px solid #3d9aff}}
 tbody tr{{border-bottom:1px solid #0d1624;transition:background .12s}}
 tbody tr:hover{{background:#0e1a2e}} tbody tr:last-child{{border-bottom:none}}
-td{{padding:10px 14px;vertical-align:middle}}
+td{{padding:10px 14px;vertical-align:middle;color:#aabdd0}}
 col.c-em{{width:auto}} col.c-ask{{width:160px}} col.c-bid{{width:160px}} col.c-spr{{width:120px}}
 .td-em{{font-family:'Fira Code',monospace;font-size:13px;font-weight:600;color:#7abdff}}
 .td-r{{text-align:right}}
 </style></head><body>
 <div class="wrap"><table>
 <colgroup><col class="c-em"><col class="c-ask"><col class="c-bid"><col class="c-spr"></colgroup>
-<thead><tr>
-<th>Emisora</th>
-<th class="r ask">ASK · Compra</th>
-<th class="r bid">BID · Venta</th>
-<th class="r">Spread</th>
-</tr></thead>
-<tbody>{rows}</tbody>
-</table></div></body></html>"""
-    return height, html
+<thead><tr><th>Emisora</th><th class="r ask">ASK · Compra</th><th class="r bid">BID · Venta</th><th class="r">Spread</th></tr></thead>
+<tbody>{rows}</tbody></table></div></body></html>"""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -379,10 +320,11 @@ col.c-em{{width:auto}} col.c-ask{{width:160px}} col.c-bid{{width:160px}} col.c-s
 # ─────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### ⚙️ Parámetros")
-    refresh_sec = st.slider("Refresco (seg)", 1, 60, 1, 1)
+    refresh_sec = st.slider("Refresco (seg)", 1, 30, 1, 1)
     st.markdown("---")
-    st.caption(f"Repo: `{GITHUB_REPO}`")
-    st.caption("Zona: **CDMX**  ·  Delay: **~10 seg**")
+    st.caption(f"Servidor: `{SERVER_URL}`")
+    st.caption("Zona: **CDMX**")
+    st.caption("⚡ Latencia directa ~500ms")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -397,7 +339,7 @@ iteration = 0
 prev_uc = prev_uv = None
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LOOP
+# LOOP PRINCIPAL
 # ─────────────────────────────────────────────────────────────────────────────
 while True:
     iteration += 1
@@ -406,29 +348,28 @@ while True:
     now_full = now.strftime("%Y-%m-%d %H:%M:%S")
     now_date = now.strftime("%d %b %Y").upper()
 
-    df_c  = fetch_csv("data/compra.csv")
-    df_v  = fetch_csv("data/venta.csv")
-    meta  = fetch_meta()
-    calc  = fetch_calc()
+    data = fetch_all()
 
     # ── Estado ───────────────────────────────────────────────────────────────
-    last_update = meta.get("last_update","")
-    secs_ago = 9999; secs_str = "—"
-    if last_update:
-        try:
-            lu = datetime.strptime(last_update, "%Y-%m-%d %H:%M:%S").replace(tzinfo=CDMX)
-            secs_ago = (now - lu).total_seconds()
-            secs_str = f"{int(secs_ago)}s" if secs_ago < 60 else f"{int(secs_ago/60)}m {int(secs_ago%60)}s"
-        except: pass
-
-    if df_c is None or df_v is None:
-        status = "nodata"
-    elif secs_ago > DEAD_SECS:
-        status = "dead"
-    elif secs_ago > STALE_SECS:
-        status = "warn"
+    if data is None:
+        status = "dead"; secs_str = "—"; last_update = "—"; latency_ms = 0
     else:
-        status = "live"
+        last_update = data.get("last_update","—")
+        latency_ms  = data.get("latency_ms", 0)
+        secs_ago    = 9999; secs_str = "—"
+        if last_update and last_update != "—":
+            try:
+                lu = datetime.strptime(last_update, "%Y-%m-%d %H:%M:%S").replace(tzinfo=CDMX)
+                secs_ago = (now - lu).total_seconds()
+                secs_str = f"{int(secs_ago)}s" if secs_ago < 60 else f"{int(secs_ago/60)}m {int(secs_ago%60)}s"
+            except: pass
+        if secs_ago > DEAD_SECS:   status = "dead"
+        elif secs_ago > STALE_SECS: status = "warn"
+        else:                        status = "live"
+
+    compra_records = data.get("compra", []) if data else []
+    venta_records  = data.get("venta",  []) if data else []
+    calc           = data.get("calc",   {}) if data else {}
 
     h = now.hour
     mkts = {"BMV":8<=h<15,"BIVA":8<=h<15,"NYSE":8<=h<15,"NASDAQ":8<=h<15}
@@ -438,12 +379,15 @@ while True:
         for k,v in mkts.items()
     ])
 
+    lat_color = "#00d68f" if latency_ms < 800 else "#ffaa00" if latency_ms < 2000 else "#ff4d6a"
+    lat_html  = f'<span style="font-family:Fira Code,monospace;font-size:10px;color:{lat_color};background:rgba(0,0,0,.3);border:1px solid {lat_color}33;padding:3px 10px;border-radius:4px">⚡ {latency_ms}ms</span>'
+
     if status=="live":
         badge='<span class="pill pill-live"><span class="pdot pdot-live"></span>EN VIVO</span>'
     elif status=="warn":
         badge=f'<span class="pill pill-warn"><span class="pdot pdot-warn"></span>SIN CAMBIOS · {secs_str}</span>'
     else:
-        badge=f'<span class="pill pill-dead"><span class="pdot pdot-dead"></span>DESCONECTADO · {secs_str}</span>'
+        badge=f'<span class="pill pill-dead"><span class="pdot pdot-dead"></span>DESCONECTADO</span>'
 
     # ── NAVBAR ────────────────────────────────────────────────────────────────
     with nav_ph.container():
@@ -456,6 +400,7 @@ while True:
           </div>
           <div class="nav-markets">{mkt_html}</div>
           <div class="nav-right">
+            {lat_html}
             <div><div class="nav-clock">{now_time}</div>
             <div class="nav-tz">CDMX · {now_date}</div></div>
             {badge}
@@ -466,25 +411,24 @@ while True:
     with alert_ph.container():
         if status == "warn":
             st.markdown(f'<div class="alert-strip alert-warn">⚠ &nbsp; Bloomberg sin cambios hace <strong>{secs_str}</strong> · Último dato: <strong>{last_update} CDMX</strong></div>', unsafe_allow_html=True)
-        elif status in ("dead","nodata"):
-            st.markdown(f'<div class="alert-strip alert-dead">✖ &nbsp; Conexión perdida hace <strong>{secs_str}</strong> · PC Bloomberg apagada · Internet caído · uploader.py cerrado</div>', unsafe_allow_html=True)
+        elif status == "dead":
+            st.markdown(f'<div class="alert-strip alert-dead">✖ &nbsp; Sin conexión al servidor · Verifica que <strong>start.bat</strong> esté corriendo en la PC Bloomberg · URL: <strong>{SERVER_URL}</strong></div>', unsafe_allow_html=True)
 
     # ── TABS ──────────────────────────────────────────────────────────────────
     with tabs_ph.container():
         tab1, tab2 = st.tabs(["📊  MONITOR  $", "💱  COTIZADOR"])
 
-        # ════════════════════════════════════════════════════════════════════
-        # TAB 1 — MONITOR
-        # ════════════════════════════════════════════════════════════════════
+        # ── TAB 1: MONITOR ────────────────────────────────────────────────────
         with tab1:
-            if status == "nodata" or df_c is None:
-                st.markdown('<div class="content"><div style="padding:40px;text-align:center;color:#3a5272;font-family:Fira Code,monospace">Sin datos — verifica que uploader.py esté corriendo</div></div>', unsafe_allow_html=True)
+            if not compra_records:
+                st.markdown('<div class="content"><div style="padding:40px;text-align:center;color:#3a5272;font-family:Fira Code,monospace">Sin datos · Verifica que start.bat esté corriendo</div></div>', unsafe_allow_html=True)
             else:
-                uc   = pd.to_numeric(df_c["Utilidad"],    errors="coerce").sum()
-                uv   = pd.to_numeric(df_v["Utilidad"],    errors="coerce").sum()
-                inv  = pd.to_numeric(df_c["Inversión"] if "Inversión" in df_c.columns else df_c.get("Inversion", pd.Series()), errors="coerce").sum()
-                rmax = pd.to_numeric(df_c["Rendimiento"], errors="coerce").max()
-                nc, nv = len(df_c), len(df_v)
+                uc   = sum(float(r.get("Utilidad",0) or 0) for r in compra_records)
+                uv   = sum(float(r.get("Utilidad",0) or 0) for r in venta_records)
+                inv  = sum(float(r.get("Inversión", r.get("Inversion",0)) or 0) for r in compra_records)
+                rmax = max((float(r.get("Rendimiento",0) or 0) for r in compra_records), default=0)
+                nc, nv = len(compra_records), len(venta_records)
+
                 d_c = f"{'▲' if prev_uc is None or uc>=prev_uc else '▼'} ${abs(uc-(prev_uc or uc)):,.2f}" if prev_uc is not None else "sesión actual"
                 d_v = f"{'▲' if prev_uv is None or uv>=prev_uv else '▼'} ${abs(uv-(prev_uv or uv)):,.2f}" if prev_uv is not None else "sesión actual"
                 prev_uc, prev_uv = uc, uv
@@ -499,90 +443,52 @@ while True:
                 </div>""", unsafe_allow_html=True)
 
                 st.markdown(f'<div class="tbl-header"><span class="tbl-tag tag-c">▲ Compra</span><span class="tbl-meta">{nc} oportunidades</span><span class="tbl-total tt-green">${uc:,.2f}</span></div>', unsafe_allow_html=True)
-                h_c, html_c = build_table(df_c, "compra")
+                h_c, html_c = build_monitor_table(compra_records, "compra")
                 components.html(html_c, height=h_c, scrolling=False)
 
                 st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
 
                 st.markdown(f'<div class="tbl-header"><span class="tbl-tag tag-v">▼ Venta</span><span class="tbl-meta">{nv} oportunidades</span><span class="tbl-total tt-purple">${uv:,.2f}</span></div>', unsafe_allow_html=True)
-                h_v, html_v = build_table(df_v, "venta")
+                h_v, html_v = build_monitor_table(venta_records, "venta")
                 components.html(html_v, height=h_v, scrolling=False)
-
                 st.markdown("</div>", unsafe_allow_html=True)
 
-        # ════════════════════════════════════════════════════════════════════
-        # TAB 2 — COTIZADOR
-        # ════════════════════════════════════════════════════════════════════
+        # ── TAB 2: COTIZADOR ──────────────────────────────────────────────────
         with tab2:
             st.markdown('<div class="cot-wrap">', unsafe_allow_html=True)
+            fx = calc.get("fx", {})
+            fx_bid = fx.get("bid"); fx_ask = fx.get("ask")
+            fx_bid_usd = fx.get("bid_usd"); fx_ask_usd = fx.get("ask_usd")
 
-            if calc is None:
-                st.markdown('<div style="padding:40px;text-align:center;color:#3a5272;font-family:Fira Code,monospace">Sin datos de Calc — verifica uploader.py</div>', unsafe_allow_html=True)
-            else:
-                # ── FX Bar ───────────────────────────────────────────────
-                fx = calc.get("fx", {})
-                fx_bid     = fx.get("bid")
-                fx_ask     = fx.get("ask")
-                fx_bid_usd = fx.get("bid_usd")
-                fx_ask_usd = fx.get("ask_usd")
+            st.markdown(f"""
+            <div class="fx-bar">
+              <div class="fx-title">MXN / USD</div>
+              <div class="fx-sep"></div>
+              <div><div class="fx-label">BID</div><div class="fx-val fx-bid">{"${:.4f}".format(fx_bid) if fx_bid else "—"}</div></div>
+              <div><div class="fx-label">ASK</div><div class="fx-val fx-ask">{"${:.4f}".format(fx_ask) if fx_ask else "—"}</div></div>
+              <div class="fx-sep"></div>
+              <div><div class="fx-label">BID USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx_bid_usd) if fx_bid_usd else "—"}</div></div>
+              <div><div class="fx-label">ASK USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx_ask_usd) if fx_ask_usd else "—"}</div></div>
+            </div>""", unsafe_allow_html=True)
 
-                fx_bid_str     = f'${fx_bid:.4f}'     if fx_bid     else "—"
-                fx_ask_str     = f'${fx_ask:.4f}'     if fx_ask     else "—"
-                fx_bid_usd_str = f'{fx_bid_usd:.7f}'  if fx_bid_usd else "—"
-                fx_ask_usd_str = f'{fx_ask_usd:.7f}'  if fx_ask_usd else "—"
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown('<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:#4a6280;text-transform:uppercase;padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">Emisoras Fijas</div>', unsafe_allow_html=True)
+                fijo = calc.get("fijo", [])
+                if fijo:
+                    hf, htmlf = build_cotizador_table(fijo)
+                    components.html(htmlf, height=hf, scrolling=False)
+                else:
+                    st.markdown('<div style="color:#3a5272;font-size:11px;padding:20px">Sin datos</div>', unsafe_allow_html=True)
 
-                st.markdown(f"""
-                <div class="fx-bar">
-                  <div class="fx-title">MXN / USD</div>
-                  <div class="fx-sep"></div>
-                  <div>
-                    <div class="fx-label">BID</div>
-                    <div class="fx-val fx-bid">{fx_bid_str}</div>
-                  </div>
-                  <div>
-                    <div class="fx-label">ASK</div>
-                    <div class="fx-val fx-ask">{fx_ask_str}</div>
-                  </div>
-                  <div class="fx-sep"></div>
-                  <div>
-                    <div class="fx-label">BID USD</div>
-                    <div class="fx-val" style="font-size:14px;color:#4a6280">{fx_bid_usd_str}</div>
-                  </div>
-                  <div>
-                    <div class="fx-label">ASK USD</div>
-                    <div class="fx-val" style="font-size:14px;color:#4a6280">{fx_ask_usd_str}</div>
-                  </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # ── Tablas lado a lado ────────────────────────────────────
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.markdown("""
-                    <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;
-                    letter-spacing:2px;color:#4a6280;text-transform:uppercase;
-                    padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">
-                    Emisoras Fijas</div>""", unsafe_allow_html=True)
-                    fijo = calc.get("fijo", [])
-                    if fijo:
-                        hf, htmlf = build_cotizador_table(fijo, "Fijas", "#f5d020", "#3d9aff")
-                        components.html(htmlf, height=hf, scrolling=False)
-                    else:
-                        st.markdown('<div style="color:#3a5272;font-family:Fira Code,monospace;font-size:11px;padding:20px">Sin datos</div>', unsafe_allow_html=True)
-
-                with col2:
-                    st.markdown("""
-                    <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;
-                    letter-spacing:2px;color:#4a6280;text-transform:uppercase;
-                    padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">
-                    Cotización Manual (A10:A20)</div>""", unsafe_allow_html=True)
-                    edit = calc.get("editable", [])
-                    if edit:
-                        he, htmle = build_cotizador_table(edit, "Manual", "#f5d020", "#3d9aff")
-                        components.html(htmle, height=he, scrolling=False)
-                    else:
-                        st.markdown('<div style="color:#3a5272;font-family:Fira Code,monospace;font-size:11px;padding:20px">Escribe una emisora en A10:A20 del Excel</div>', unsafe_allow_html=True)
+            with col2:
+                st.markdown('<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:#4a6280;text-transform:uppercase;padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">Cotización Manual (A10:A20)</div>', unsafe_allow_html=True)
+                edit = calc.get("editable", [])
+                if edit:
+                    he, htmle = build_cotizador_table(edit)
+                    components.html(htmle, height=he, scrolling=False)
+                else:
+                    st.markdown('<div style="color:#3a5272;font-size:11px;padding:20px">Escribe una emisora en A10:A20 del Excel</div>', unsafe_allow_html=True)
 
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -592,12 +498,9 @@ while True:
         <div class="footer-bar">
           <div class="footer-item"><span class="fi-label">PLATAFORMA</span><span class="fi-value">Composite Man · Arbitrage Intelligence</span></div>
           <div class="footer-item"><span class="fi-label">APP RECARGADA</span><span class="fi-value">{now_full} CDMX</span></div>
-          <div class="footer-item"><span class="fi-label">BLOOMBERG ACTUALIZÓ</span><span class="fi-value">{last_update or '—'} CDMX</span></div>
-          <div class="footer-item"><span class="fi-label">DELAY</span><span class="fi-value">~10 seg Bloomberg → Pantalla</span></div>
+          <div class="footer-item"><span class="fi-label">BLOOMBERG ACTUALIZÓ</span><span class="fi-value">{last_update} CDMX</span></div>
+          <div class="footer-item"><span class="fi-label">LATENCIA SERVIDOR</span><span class="fi-value">⚡ {latency_ms}ms</span></div>
           <div class="footer-item"><span class="fi-label">ITER</span><span class="fi-value">#{iteration} · {refresh_sec}s</span></div>
         </div>""", unsafe_allow_html=True)
 
     time.sleep(refresh_sec)
-    fetch_csv.clear()
-    fetch_meta.clear()
-    fetch_calc.clear()
