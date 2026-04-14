@@ -1,15 +1,13 @@
 """
-app.py v8 — Sin parpadeo
-=========================
-Usa fragmentos de Streamlit para actualizar solo los datos
-sin recargar toda la página.
+app.py v8 — Sin parpadeo, datos correctos
+==========================================
+EDITA SERVER_URL con tu URL de ngrok
 """
 
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import pandas as pd
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -32,103 +30,100 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=Fira+Code:wght@400;500;600&display=swap');
-:root {
-    --bg0:#04080f; --bg1:#080e1c; --bg2:#0c1528;
-    --border:#162035; --border2:#1e2e4a;
-    --text0:#eef2f8; --text1:#99adc4; --text2:#4a6280; --text3:#283850;
-    --gold:#e8b84b; --blue:#3d9aff; --green:#00d68f;
-    --red:#ff4d6a; --amber:#ffaa00; --teal:#00c8d4; --purple:#b060ff;
-    --yellow:#f5d020;
+:root{
+    --bg0:#04080f;--bg1:#080e1c;--bg2:#0c1528;
+    --border:#162035;--text0:#eef2f8;--text1:#99adc4;--text2:#4a6280;--text3:#283850;
+    --gold:#e8b84b;--blue:#3d9aff;--green:#00d68f;
+    --red:#ff4d6a;--amber:#ffaa00;--teal:#00c8d4;--purple:#b060ff;--yellow:#f5d020;
 }
-*,html,body,[class*="css"]{ font-family:'Barlow',sans-serif !important; box-sizing:border-box; }
-.stApp{ background:var(--bg0) !important; color:var(--text0) !important; }
-.block-container{ padding:0 !important; max-width:100% !important; }
-section[data-testid="stSidebar"]{ background:var(--bg1) !important; border-right:1px solid var(--border) !important; }
-#MainMenu,footer,header,.stDeployButton{ visibility:hidden; display:none; }
+*,html,body,[class*="css"]{font-family:'Barlow',sans-serif !important;box-sizing:border-box;}
+.stApp{background:var(--bg0) !important;color:var(--text0) !important;}
+.block-container{padding:0 !important;max-width:100% !important;}
+section[data-testid="stSidebar"]{background:var(--bg1) !important;border-right:1px solid var(--border) !important;}
+#MainMenu,footer,header,.stDeployButton{visibility:hidden;display:none;}
 
 /* TABS */
-.stTabs [data-baseweb="tab-list"]{ background:var(--bg1) !important; border-bottom:1px solid var(--border) !important; padding:0 24px !important; gap:0 !important; }
-.stTabs [data-baseweb="tab"]{ background:transparent !important; color:var(--text2) !important; font-family:'Barlow Condensed',sans-serif !important; font-size:13px !important; font-weight:600 !important; letter-spacing:2px !important; text-transform:uppercase !important; padding:14px 22px !important; border-bottom:2px solid transparent !important; border-radius:0 !important; }
-.stTabs [aria-selected="true"]{ color:var(--gold) !important; border-bottom:2px solid var(--gold) !important; background:transparent !important; }
-.stTabs [data-baseweb="tab-panel"]{ padding:0 !important; }
+.stTabs [data-baseweb="tab-list"]{background:var(--bg1) !important;border-bottom:1px solid var(--border) !important;padding:0 24px !important;gap:0 !important;}
+.stTabs [data-baseweb="tab"]{background:transparent !important;color:var(--text2) !important;font-family:'Barlow Condensed',sans-serif !important;font-size:13px !important;font-weight:600 !important;letter-spacing:2px !important;text-transform:uppercase !important;padding:14px 22px !important;border-bottom:2px solid transparent !important;border-radius:0 !important;}
+.stTabs [aria-selected="true"]{color:var(--gold) !important;border-bottom:2px solid var(--gold) !important;background:transparent !important;}
+.stTabs [data-baseweb="tab-panel"]{padding:0 !important;}
 
 /* NAVBAR */
-.navbar{ display:flex; align-items:stretch; background:var(--bg1); border-bottom:1px solid var(--border); height:54px; padding:0 24px; position:sticky; top:0; z-index:100; }
-.nav-brand{ display:flex; align-items:center; gap:12px; padding-right:24px; border-right:1px solid var(--border); }
-.nav-logo{ width:34px; height:34px; background:linear-gradient(135deg,var(--gold) 0%,#9a6800 100%); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:'Fira Code',monospace; font-size:12px; font-weight:700; color:#000; box-shadow:0 0 14px rgba(232,184,75,.3); }
-.nav-name{ font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:700; color:var(--text0); letter-spacing:1px; text-transform:uppercase; }
-.nav-tagline{ font-size:9px; color:var(--text2); letter-spacing:2px; text-transform:uppercase; }
-.nav-markets{ display:flex; align-items:center; padding:0 4px; border-right:1px solid var(--border); }
-.nav-market{ display:flex; flex-direction:column; align-items:center; padding:0 14px; border-right:1px solid var(--border); }
-.nav-market:last-child{ border-right:none; }
-.nm-name{ font-family:'Fira Code',monospace; font-size:9px; font-weight:600; color:var(--text2); letter-spacing:1px; }
-.nm-open{ font-size:9px; font-weight:700; color:var(--green); }
-.nm-closed{ font-size:9px; color:var(--text3); }
-.nav-right{ display:flex; align-items:center; gap:16px; margin-left:auto; }
-.nav-clock{ font-family:'Fira Code',monospace; font-size:14px; color:var(--text1); }
-.nav-tz{ font-size:9px; color:var(--text3); letter-spacing:1px; text-align:right; }
+.navbar{display:flex;align-items:stretch;background:var(--bg1);border-bottom:1px solid var(--border);height:54px;padding:0 24px;position:sticky;top:0;z-index:100;}
+.nav-brand{display:flex;align-items:center;gap:12px;padding-right:24px;border-right:1px solid var(--border);}
+.nav-logo{width:34px;height:34px;background:linear-gradient(135deg,var(--gold) 0%,#9a6800 100%);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'Fira Code',monospace;font-size:12px;font-weight:700;color:#000;box-shadow:0 0 14px rgba(232,184,75,.3);}
+.nav-name{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--text0);letter-spacing:1px;text-transform:uppercase;}
+.nav-tagline{font-size:9px;color:var(--text2);letter-spacing:2px;text-transform:uppercase;}
+.nav-markets{display:flex;align-items:center;padding:0 4px;border-right:1px solid var(--border);}
+.nav-market{display:flex;flex-direction:column;align-items:center;padding:0 14px;border-right:1px solid var(--border);}
+.nav-market:last-child{border-right:none;}
+.nm-name{font-family:'Fira Code',monospace;font-size:9px;font-weight:600;color:var(--text2);letter-spacing:1px;}
+.nm-open{font-size:9px;font-weight:700;color:var(--green);}
+.nm-closed{font-size:9px;color:var(--text3);}
+.nav-right{display:flex;align-items:center;gap:16px;margin-left:auto;}
+.nav-clock{font-family:'Fira Code',monospace;font-size:14px;color:var(--text1);}
+.nav-tz{font-size:9px;color:var(--text3);letter-spacing:1px;text-align:right;}
 
 /* PILLS */
-.pill{ display:inline-flex; align-items:center; gap:7px; padding:5px 14px; border-radius:4px; font-family:'Fira Code',monospace; font-size:10px; font-weight:600; letter-spacing:1.5px; }
-.pill-live{ background:rgba(0,214,143,.08); border:1px solid rgba(0,214,143,.3); color:var(--green); }
-.pill-warn{ background:rgba(255,170,0,.08); border:1px solid rgba(255,170,0,.3); color:var(--amber); }
-.pill-dead{ background:rgba(255,77,106,.08); border:1px solid rgba(255,77,106,.3); color:var(--red); }
-.pdot{ width:7px; height:7px; border-radius:50%; }
-.pdot-live{ background:var(--green); box-shadow:0 0 7px var(--green); animation:blink 1.6s ease infinite; }
-.pdot-warn{ background:var(--amber); box-shadow:0 0 7px var(--amber); animation:blink .7s ease infinite; }
-.pdot-dead{ background:var(--red); }
-@keyframes blink{ 0%,100%{opacity:1} 50%{opacity:.1} }
+.pill{display:inline-flex;align-items:center;gap:7px;padding:5px 14px;border-radius:4px;font-family:'Fira Code',monospace;font-size:10px;font-weight:600;letter-spacing:1.5px;}
+.pill-live{background:rgba(0,214,143,.08);border:1px solid rgba(0,214,143,.3);color:var(--green);}
+.pill-warn{background:rgba(255,170,0,.08);border:1px solid rgba(255,170,0,.3);color:var(--amber);}
+.pill-dead{background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.3);color:var(--red);}
+.pdot{width:7px;height:7px;border-radius:50%;}
+.pdot-live{background:var(--green);box-shadow:0 0 7px var(--green);animation:blink 1.6s ease infinite;}
+.pdot-warn{background:var(--amber);box-shadow:0 0 7px var(--amber);animation:blink .7s ease infinite;}
+.pdot-dead{background:var(--red);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
 
 /* ALERT */
-.alert-strip{ display:flex; align-items:center; gap:12px; padding:9px 24px; font-family:'Fira Code',monospace; font-size:11px; border-bottom:1px solid; }
-.alert-warn{ background:rgba(255,170,0,.05); border-color:rgba(255,170,0,.2); color:var(--amber); }
-.alert-dead{ background:rgba(255,77,106,.05); border-color:rgba(255,77,106,.2); color:var(--red); }
-
-/* CONTENT */
-.content{ padding:18px 24px 28px 24px; }
+.alert-strip{display:flex;align-items:center;gap:12px;padding:9px 24px;font-family:'Fira Code',monospace;font-size:11px;border-bottom:1px solid;}
+.alert-warn{background:rgba(255,170,0,.05);border-color:rgba(255,170,0,.2);color:var(--amber);}
+.alert-dead{background:rgba(255,77,106,.05);border-color:rgba(255,77,106,.2);color:var(--red);}
 
 /* METRICS */
-.metric-strip{ display:grid; grid-template-columns:repeat(5,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:22px; }
-.metric-cell{ background:var(--bg1); padding:14px 18px; position:relative; }
-.metric-cell::after{ content:''; position:absolute; bottom:0; left:18px; right:18px; height:2px; border-radius:2px 2px 0 0; opacity:.7; }
-.mc-gold::after{ background:linear-gradient(90deg,var(--gold),transparent); }
-.mc-purple::after{ background:linear-gradient(90deg,var(--purple),transparent); }
-.mc-green::after{ background:linear-gradient(90deg,var(--green),transparent); }
-.mc-teal::after{ background:linear-gradient(90deg,var(--teal),transparent); }
-.mc-blue::after{ background:linear-gradient(90deg,var(--blue),transparent); }
-.metric-label{ font-family:'Fira Code',monospace; font-size:9px; color:var(--text3); letter-spacing:2px; text-transform:uppercase; margin-bottom:8px; }
-.metric-value{ font-family:'Fira Code',monospace; font-size:21px; font-weight:600; line-height:1; }
-.mv-gold{color:var(--gold)} .mv-green{color:var(--green)} .mv-blue{color:var(--blue)} .mv-teal{color:var(--teal)} .mv-purple{color:var(--purple)}
-.metric-sub{ font-size:10px; color:var(--text2); margin-top:5px; }
+.content{padding:18px 24px 28px 24px;}
+.metric-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:22px;}
+.metric-cell{background:var(--bg1);padding:14px 18px;position:relative;}
+.metric-cell::after{content:'';position:absolute;bottom:0;left:18px;right:18px;height:2px;border-radius:2px 2px 0 0;opacity:.7;}
+.mc-gold::after{background:linear-gradient(90deg,var(--gold),transparent);}
+.mc-purple::after{background:linear-gradient(90deg,var(--purple),transparent);}
+.mc-green::after{background:linear-gradient(90deg,var(--green),transparent);}
+.mc-teal::after{background:linear-gradient(90deg,var(--teal),transparent);}
+.mc-blue::after{background:linear-gradient(90deg,var(--blue),transparent);}
+.metric-label{font-family:'Fira Code',monospace;font-size:9px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.metric-value{font-family:'Fira Code',monospace;font-size:21px;font-weight:600;line-height:1;}
+.mv-gold{color:var(--gold)}.mv-green{color:var(--green)}.mv-blue{color:var(--blue)}.mv-teal{color:var(--teal)}.mv-purple{color:var(--purple)}
+.metric-sub{font-size:10px;color:var(--text2);margin-top:5px;}
 
-/* TABLE HEADERS */
-.tbl-header{ display:flex; align-items:center; padding:0 0 10px 0; margin-bottom:2px; border-bottom:1px solid var(--border); }
-.tbl-tag{ font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; letter-spacing:3px; text-transform:uppercase; padding:3px 12px 3px 10px; border-radius:3px; margin-right:12px; }
-.tag-c{ background:rgba(61,154,255,.1); color:var(--blue); border-left:3px solid var(--blue); }
-.tag-v{ background:rgba(176,96,255,.1); color:var(--purple); border-left:3px solid var(--purple); }
-.tbl-meta{ font-family:'Fira Code',monospace; font-size:10px; color:var(--text2); }
-.tbl-total{ margin-left:auto; font-family:'Fira Code',monospace; font-size:13px; font-weight:600; }
-.tt-green{color:var(--green)} .tt-purple{color:var(--purple)}
+/* TABLE SECTION HEADERS */
+.tbl-header{display:flex;align-items:center;padding:0 0 10px 0;margin-bottom:2px;border-bottom:1px solid var(--border);}
+.tbl-tag{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding:3px 12px 3px 10px;border-radius:3px;margin-right:12px;}
+.tag-c{background:rgba(61,154,255,.1);color:var(--blue);border-left:3px solid var(--blue);}
+.tag-v{background:rgba(176,96,255,.1);color:var(--purple);border-left:3px solid var(--purple);}
+.tbl-meta{font-family:'Fira Code',monospace;font-size:10px;color:var(--text2);}
+.tbl-total{margin-left:auto;font-family:'Fira Code',monospace;font-size:13px;font-weight:600;}
+.tt-green{color:var(--green)}.tt-purple{color:var(--purple)}
 
 /* FOOTER */
-.footer-bar{ display:flex; align-items:center; justify-content:space-between; padding:10px 24px; border-top:1px solid var(--border); background:var(--bg1); font-family:'Fira Code',monospace; font-size:9px; color:var(--text3); margin-top:12px; }
-.footer-item{ display:flex; flex-direction:column; gap:2px; }
-.fi-label{color:var(--text3)} .fi-value{color:var(--text2)}
+.footer-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 24px;border-top:1px solid var(--border);background:var(--bg1);font-family:'Fira Code',monospace;font-size:9px;color:var(--text3);margin-top:12px;}
+.footer-item{display:flex;flex-direction:column;gap:2px;}
+.fi-label{color:var(--text3)}.fi-value{color:var(--text2)}
 
 /* COTIZADOR */
-.cot-wrap{ padding:20px 24px; }
-.fx-bar{ display:flex; align-items:center; gap:24px; background:var(--bg1); border:1px solid var(--border); border-radius:8px; padding:14px 20px; margin-bottom:20px; }
-.fx-label{ font-family:'Fira Code',monospace; font-size:9px; color:var(--text3); letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; }
-.fx-val{ font-family:'Fira Code',monospace; font-size:18px; font-weight:600; }
-.fx-bid{color:var(--blue)} .fx-ask{color:var(--yellow)}
-.fx-sep{ width:1px; height:40px; background:var(--border); }
-.fx-title{ font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; color:var(--text2); letter-spacing:2px; text-transform:uppercase; margin-right:8px; }
+.cot-wrap{padding:20px 24px;}
+.fx-bar{display:flex;align-items:center;gap:24px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:14px 20px;margin-bottom:20px;}
+.fx-label{font-family:'Fira Code',monospace;font-size:9px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+.fx-val{font-family:'Fira Code',monospace;font-size:18px;font-weight:600;}
+.fx-bid{color:var(--blue)}.fx-ask{color:var(--yellow)}
+.fx-sep{width:1px;height:40px;background:var(--border);}
+.fx-title{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--text2);letter-spacing:2px;text-transform:uppercase;margin-right:8px;}
+.sec-label{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:var(--text2);text-transform:uppercase;padding:6px 0 8px 0;border-bottom:1px solid var(--border);margin-bottom:8px;}
 </style>
 """, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DATA FETCH
+# FETCH
 # ─────────────────────────────────────────────────────────────────────────────
 def fetch_all():
     t0 = time.time()
@@ -166,7 +161,7 @@ def fp4(v):
 
 def fpct(v):
     try:
-        f = float(v)
+        f   = float(v)
         sym = "▲" if f >= 0 else "▼"
         cls = "pct-up" if f >= 0 else "pct-dn"
         return f'<span class="{cls}">{sym} {abs(f)*100:.3f}%</span>'
@@ -174,7 +169,7 @@ def fpct(v):
 
 def fu(v):
     try:
-        f = float(v)
+        f   = float(v)
         cls = "util-pos" if f >= 0 else "util-neg"
         return f'<span class="{cls}">{fp2(v)}</span>'
     except: return "<span>—</span>"
@@ -185,7 +180,7 @@ def fi(v):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BUILD MONITOR TABLE (iframe completo — sin parpadeo)
+# BUILD MONITOR TABLE
 # ─────────────────────────────────────────────────────────────────────────────
 def build_monitor_table(records, tipo):
     accent = "#3d9aff" if tipo == "compra" else "#b060ff"
@@ -202,18 +197,29 @@ def build_monitor_table(records, tipo):
         else:
             badge = '<span class="badge badge-bmv">BMV</span>'
 
+        n     = row.get('#', 0)
+        tick  = row.get('TICKER', '')
+        emp   = row.get('Empresa', '')
+        tit   = row.get('Títulos', row.get('Titulos', 0))
+        dif   = row.get('Diferencia', 0)
+        jus   = row.get('Justo', 0)
+        rend  = row.get('Rendimiento', 0)
+        util  = row.get('Utilidad', 0)
+        inv   = row.get('Inversión', row.get('Inversion', 0))
+        pais  = str(row.get('País', row.get('Pais', ''))).strip()
+
         rows += f"""<tr>
-            <td class="td-num">{int(float(row.get('#',0)))}</td>
-            <td class="td-ticker">{row.get('TICKER','')}</td>
-            <td class="td-empresa">{row.get('Empresa','')}</td>
+            <td class="td-num">{int(float(n))}</td>
+            <td class="td-ticker">{tick}</td>
+            <td class="td-empresa">{emp}</td>
             <td class="td-op">{badge}</td>
-            <td class="td-r">{fi(row.get('Títulos', row.get('Titulos',0)))}</td>
-            <td class="td-r mono">{fp2(row.get('Diferencia',0))}</td>
-            <td class="td-r mono">{fp2(row.get('Justo',0))}</td>
-            <td class="td-r">{fpct(row.get('Rendimiento',0))}</td>
-            <td class="td-r mono">{fu(row.get('Utilidad',0))}</td>
-            <td class="td-r mono dim">{fp2(row.get('Inversión', row.get('Inversion',0)))}</td>
-            <td class="td-pais">{str(row.get('País', row.get('Pais',''))).strip()}</td>
+            <td class="td-r">{fi(tit)}</td>
+            <td class="td-r mono">{fp2(dif)}</td>
+            <td class="td-r mono">{fp2(jus)}</td>
+            <td class="td-r">{fpct(rend)}</td>
+            <td class="td-r mono">{fu(util)}</td>
+            <td class="td-r mono dim">{fp2(inv)}</td>
+            <td class="td-pais">{pais}</td>
         </tr>"""
 
     return height, f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -229,10 +235,10 @@ thead th.r{{text-align:right}} thead th.hi{{color:{accent};border-bottom:2px sol
 tbody tr{{border-bottom:1px solid #0d1624;transition:background .12s}}
 tbody tr:hover{{background:#0e1a2e}} tbody tr:last-child{{border-bottom:none}}
 td{{padding:9px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;color:#aabdd0}}
-col.c-num{{width:42px}} col.c-tick{{width:88px}} col.c-emp{{width:auto}}
-col.c-op{{width:115px}} col.c-tit{{width:72px}} col.c-dif{{width:105px}}
+col.c-num{{width:40px}} col.c-tick{{width:88px}} col.c-emp{{width:auto}}
+col.c-op{{width:115px}} col.c-tit{{width:70px}} col.c-dif{{width:105px}}
 col.c-just{{width:115px}} col.c-rdto{{width:105px}} col.c-util{{width:112px}}
-col.c-inv{{width:115px}} col.c-pais{{width:122px}}
+col.c-inv{{width:115px}} col.c-pais{{width:120px}}
 .td-num{{text-align:center;font-family:'Fira Code',monospace;font-size:11px;color:#1e3050}}
 .td-ticker{{font-family:'Fira Code',monospace;font-size:13px;font-weight:600;color:{accent}}}
 .td-empresa{{font-size:12px;font-weight:500;color:#8aadcc}}
@@ -265,9 +271,9 @@ col.c-inv{{width:115px}} col.c-pais{{width:122px}}
 def build_cotizador_table(rows_data):
     nrows  = max(len(rows_data), 1)
     height = nrows * 46 + 54
-    rows = ""
+    rows   = ""
     for r in rows_data:
-        em  = r.get("emisora","—")
+        em  = r.get("emisora", "—")
         ask = r.get("ask")
         bid = r.get("bid")
         ask_str = f'<span style="color:#f5d020;font-family:Fira Code,monospace;font-weight:700">{fp4(ask)}</span>' if ask else '<span style="color:#283850">—</span>'
@@ -275,7 +281,7 @@ def build_cotizador_table(rows_data):
         spread  = ""
         if ask and bid:
             try:
-                s = float(ask) - float(bid)
+                s      = float(ask) - float(bid)
                 spread = f'<span style="color:#4a6280;font-family:Fira Code,monospace;font-size:11px">${s:.4f}</span>'
             except: pass
         rows += f"<tr><td class='td-em'>{em}</td><td class='td-r'>{ask_str}</td><td class='td-r'>{bid_str}</td><td class='td-r'>{spread}</td></tr>"
@@ -315,41 +321,43 @@ with st.sidebar:
     st.caption(f"Servidor: `{SERVER_URL}`")
     st.caption("Zona: **CDMX**  ·  ⚡ Latencia directa")
 
+
 # ─────────────────────────────────────────────────────────────────────────────
-# LAYOUT ESTÁTICO — se renderiza UNA SOLA VEZ, no parpadea
+# LAYOUT FIJO — se dibuja una sola vez
 # ─────────────────────────────────────────────────────────────────────────────
-# Navbar estática (solo cambia el reloj y status — dentro del fragment)
-nav_ph    = st.empty()
-alert_ph  = st.empty()
+nav_ph   = st.empty()
+alert_ph = st.empty()
 
 tab1, tab2 = st.tabs(["📊  MONITOR  $", "💱  COTIZADOR"])
 
 with tab1:
     metrics_ph  = st.empty()
-    header_c_ph = st.empty()
-    table_c_ph  = st.empty()
-    spacer_ph   = st.empty()
-    header_v_ph = st.empty()
-    table_v_ph  = st.empty()
+    hdr_c_ph    = st.empty()
+    tbl_c_ph    = st.empty()
+    gap_ph      = st.empty()
+    hdr_v_ph    = st.empty()
+    tbl_v_ph    = st.empty()
 
 with tab2:
-    fx_ph    = st.empty()
+    st.markdown('<div class="cot-wrap">', unsafe_allow_html=True)
+    fx_ph   = st.empty()
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown('<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:#4a6280;text-transform:uppercase;padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">Emisoras Fijas</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-label">Emisoras Fijas</div>', unsafe_allow_html=True)
         fijo_ph = st.empty()
     with col2:
-        st.markdown('<div style="font-family:Barlow Condensed,sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;color:#4a6280;text-transform:uppercase;padding:6px 0 8px 0;border-bottom:1px solid #162035;margin-bottom:8px">Cotización Manual (A10:A20)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-label">Cotización Manual · A10:A20</div>', unsafe_allow_html=True)
         edit_ph = st.empty()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 foot_ph = st.empty()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FUNCIÓN DE ACTUALIZACIÓN — solo actualiza los placeholders, sin recargar UI
+# FRAGMENT — actualiza solo los datos, sin recargar la página
 # ─────────────────────────────────────────────────────────────────────────────
 @st.fragment(run_every=refresh_sec)
-def update_data():
+def actualizar():
     now      = cdmx_now()
     now_time = now.strftime("%H:%M:%S")
     now_full = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -372,10 +380,11 @@ def update_data():
             except: pass
         status = "dead" if secs_ago > DEAD_SECS else "warn" if secs_ago > STALE_SECS else "live"
 
-    compra_records = data.get("compra", []) if data else []
-    venta_records  = data.get("venta",  []) if data else []
-    calc           = data.get("calc",   {}) if data else {}
+    compra  = data.get("compra", []) if data else []
+    venta   = data.get("venta",  []) if data else []
+    calc    = data.get("calc",   {}) if data else {}
 
+    # ── Mercados ──────────────────────────────────────────────────────────────
     h    = now.hour
     mkts = {"BMV":8<=h<15,"BIVA":8<=h<15,"NYSE":8<=h<15,"NASDAQ":8<=h<15}
     mkt_html = "".join([
@@ -415,17 +424,17 @@ def update_data():
     if status == "warn":
         alert_ph.markdown(f'<div class="alert-strip alert-warn">⚠ &nbsp; Bloomberg sin cambios hace <strong>{secs_str}</strong> · Último dato: <strong>{last_update} CDMX</strong></div>', unsafe_allow_html=True)
     elif status == "dead":
-        alert_ph.markdown(f'<div class="alert-strip alert-dead">✖ &nbsp; Sin conexión al servidor · Verifica que <strong>start.bat</strong> esté corriendo · URL: <strong>{SERVER_URL}</strong></div>', unsafe_allow_html=True)
+        alert_ph.markdown(f'<div class="alert-strip alert-dead">✖ &nbsp; Sin conexión · Verifica que <strong>start.bat</strong> esté corriendo · <strong>{SERVER_URL}</strong></div>', unsafe_allow_html=True)
     else:
         alert_ph.empty()
 
-    # ── MÉTRICAS ──────────────────────────────────────────────────────────────
-    if compra_records:
-        uc   = sum(float(r.get("Utilidad",0) or 0) for r in compra_records)
-        uv   = sum(float(r.get("Utilidad",0) or 0) for r in venta_records)
-        inv  = sum(float(r.get("Inversión", r.get("Inversion",0)) or 0) for r in compra_records)
-        rmax = max((float(r.get("Rendimiento",0) or 0) for r in compra_records), default=0)
-        nc, nv = len(compra_records), len(venta_records)
+    # ── MONITOR ───────────────────────────────────────────────────────────────
+    if compra:
+        uc   = sum(float(r.get("Utilidad", 0) or 0) for r in compra)
+        uv   = sum(float(r.get("Utilidad", 0) or 0) for r in venta)
+        inv  = sum(float(r.get("Inversión", r.get("Inversion", 0)) or 0) for r in compra)
+        rmax = max((float(r.get("Rendimiento", 0) or 0) for r in compra), default=0)
+        nc, nv = len(compra), len(venta)
 
         metrics_ph.markdown(f"""<div class="content">
         <div class="metric-strip">
@@ -436,33 +445,31 @@ def update_data():
           <div class="metric-cell mc-blue"><div class="metric-label">Oportunidades</div><div class="metric-value mv-blue">{nc+nv}</div><div class="metric-sub">{nc} compra · {nv} venta</div></div>
         </div></div>""", unsafe_allow_html=True)
 
-        # Tablas Monitor
-        header_c_ph.markdown(f'<div style="padding:0 24px"><div class="tbl-header"><span class="tbl-tag tag-c">▲ Compra</span><span class="tbl-meta">{nc} oportunidades activas</span><span class="tbl-total tt-green">${uc:,.2f} utilidad total</span></div></div>', unsafe_allow_html=True)
-        h_c, html_c = build_monitor_table(compra_records, "compra")
-        with table_c_ph:
+        hdr_c_ph.markdown(f'<div style="padding:0 24px"><div class="tbl-header"><span class="tbl-tag tag-c">▲ Compra</span><span class="tbl-meta">{nc} oportunidades activas</span><span class="tbl-total tt-green">${uc:,.2f} utilidad total</span></div></div>', unsafe_allow_html=True)
+        h_c, html_c = build_monitor_table(compra, "compra")
+        tbl_c_ph.empty()
+        with tbl_c_ph:
             components.html(html_c, height=h_c, scrolling=False)
 
-        spacer_ph.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+        gap_ph.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
 
-        header_v_ph.markdown(f'<div style="padding:0 24px"><div class="tbl-header"><span class="tbl-tag tag-v">▼ Venta</span><span class="tbl-meta">{nv} oportunidades activas</span><span class="tbl-total tt-purple">${uv:,.2f} utilidad total</span></div></div>', unsafe_allow_html=True)
-        h_v, html_v = build_monitor_table(venta_records, "venta")
-        with table_v_ph:
+        hdr_v_ph.markdown(f'<div style="padding:0 24px"><div class="tbl-header"><span class="tbl-tag tag-v">▼ Venta</span><span class="tbl-meta">{nv} oportunidades activas</span><span class="tbl-total tt-purple">${uv:,.2f} utilidad total</span></div></div>', unsafe_allow_html=True)
+        h_v, html_v = build_monitor_table(venta, "venta")
+        tbl_v_ph.empty()
+        with tbl_v_ph:
             components.html(html_v, height=h_v, scrolling=False)
 
     # ── COTIZADOR ─────────────────────────────────────────────────────────────
     fx = calc.get("fx", {})
-    fx_bid = fx.get("bid"); fx_ask = fx.get("ask")
-    fx_bid_usd = fx.get("bid_usd"); fx_ask_usd = fx.get("ask_usd")
-
     fx_ph.markdown(f"""
     <div class="fx-bar">
       <div class="fx-title">MXN / USD</div>
       <div class="fx-sep"></div>
-      <div><div class="fx-label">BID</div><div class="fx-val fx-bid">{"${:.4f}".format(fx_bid) if fx_bid else "—"}</div></div>
-      <div><div class="fx-label">ASK</div><div class="fx-val fx-ask">{"${:.4f}".format(fx_ask) if fx_ask else "—"}</div></div>
+      <div><div class="fx-label">BID</div><div class="fx-val fx-bid">{"${:.4f}".format(fx["bid"]) if fx.get("bid") else "—"}</div></div>
+      <div><div class="fx-label">ASK</div><div class="fx-val fx-ask">{"${:.4f}".format(fx["ask"]) if fx.get("ask") else "—"}</div></div>
       <div class="fx-sep"></div>
-      <div><div class="fx-label">BID USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx_bid_usd) if fx_bid_usd else "—"}</div></div>
-      <div><div class="fx-label">ASK USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx_ask_usd) if fx_ask_usd else "—"}</div></div>
+      <div><div class="fx-label">BID USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx["bid_usd"]) if fx.get("bid_usd") else "—"}</div></div>
+      <div><div class="fx-label">ASK USD</div><div class="fx-val" style="font-size:14px;color:#4a6280">{"{:.7f}".format(fx["ask_usd"]) if fx.get("ask_usd") else "—"}</div></div>
     </div>""", unsafe_allow_html=True)
 
     fijo = calc.get("fijo", [])
@@ -470,17 +477,17 @@ def update_data():
 
     if fijo:
         hf, htmlf = build_cotizador_table(fijo)
-        with fijo_ph:
-            components.html(htmlf, height=hf, scrolling=False)
+        fijo_ph.empty()
+        with fijo_ph: components.html(htmlf, height=hf, scrolling=False)
     else:
-        fijo_ph.markdown('<div style="color:#3a5272;font-size:11px;padding:20px">Sin datos</div>', unsafe_allow_html=True)
+        fijo_ph.markdown('<div style="color:#3a5272;font-size:11px;padding:20px;font-family:Fira Code,monospace">Sin datos</div>', unsafe_allow_html=True)
 
     if edit:
         he, htmle = build_cotizador_table(edit)
-        with edit_ph:
-            components.html(htmle, height=he, scrolling=False)
+        edit_ph.empty()
+        with edit_ph: components.html(htmle, height=he, scrolling=False)
     else:
-        edit_ph.markdown('<div style="color:#3a5272;font-size:11px;padding:20px">Escribe una emisora en A10:A20 del Excel</div>', unsafe_allow_html=True)
+        edit_ph.markdown('<div style="color:#3a5272;font-size:11px;padding:20px;font-family:Fira Code,monospace">Escribe emisoras en A10:A20 del Excel</div>', unsafe_allow_html=True)
 
     # ── FOOTER ────────────────────────────────────────────────────────────────
     foot_ph.markdown(f"""
@@ -495,4 +502,4 @@ def update_data():
 # ─────────────────────────────────────────────────────────────────────────────
 # ARRANCAR
 # ─────────────────────────────────────────────────────────────────────────────
-update_data()
+actualizar()
