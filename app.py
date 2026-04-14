@@ -17,7 +17,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # ── EDITA ESTE VALOR con la URL que te da ngrok ───────────────────────────────
-SERVER_URL = "https://abc123.ngrok-free.app"   # <-- cambia esto
+SERVER_URL = "https://discount-angling-finale.ngrok-free.dev"  # <-- cambia esto
 # ─────────────────────────────────────────────────────────────────────────────
 
 CDMX       = ZoneInfo("America/Mexico_City")
